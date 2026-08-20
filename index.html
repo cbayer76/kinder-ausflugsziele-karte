@@ -55,6 +55,7 @@
   }
   .ai-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
   .ai-feedback { font-size: 11.5px; color: var(--accent-hover); min-height: 14px; }
+  #chips { display: flex; flex-wrap: wrap; gap: 6px; }
   .chip {
     border: 1px solid var(--border);
     background: var(--chip-bg);
@@ -174,6 +175,15 @@
     main { flex-direction: column; }
     #map-pane { flex: 0 0 45vh; }
     #list-pane { flex: 1; border-left: none; border-top: 1px solid var(--border); }
+  }
+
+  @media (max-width: 600px) {
+    .search-box, .ai-box { flex: 1 1 100%; max-width: 100%; }
+    #chips { flex: 1 1 100%; gap: 8px; }
+    .chip { font-size: 14px; padding: 8px 16px; }
+    .chip .dot { width: 10px; height: 10px; }
+    .chip.reset { margin-left: 0; flex: 1 1 100%; text-align: center; padding: 8px 0; }
+    .count-badge { flex: 1 1 100%; }
   }
 
   #lockScreen {
