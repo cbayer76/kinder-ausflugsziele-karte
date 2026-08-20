@@ -175,10 +175,44 @@
     #map-pane { flex: 0 0 45vh; }
     #list-pane { flex: 1; border-left: none; border-top: 1px solid var(--border); }
   }
+
+  #lockScreen {
+    position: fixed; inset: 0; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 9999;
+  }
+  #lockScreen .lock-box {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 28px 32px; max-width: 320px; text-align: center;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+  }
+  #lockScreen h2 { margin: 0 0 6px; font-size: 16px; }
+  #lockScreen p { margin: 0 0 16px; font-size: 12.5px; color: var(--text-muted); }
+  #lockScreen input {
+    width: 100%; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+    font-size: 14px; text-align: center; margin-bottom: 10px; box-sizing: border-box;
+  }
+  #lockScreen button {
+    width: 100%; padding: 8px 10px; border: none; border-radius: 8px;
+    background: var(--accent); color: #fff; font-size: 14px; cursor: pointer;
+  }
+  #lockScreen .lock-error { color: #c92a2a; font-size: 12px; min-height: 16px; margin-top: 8px; }
+  #app.locked { display: none; }
+  #lockLink { position: fixed; bottom: 8px; right: 10px; font-size: 11px; color: var(--text-muted); z-index: 100; cursor: pointer; }
 </style>
 </head>
 <body>
-<div id="app">
+<div id="lockScreen">
+  <div class="lock-box">
+    <h2>🔒 Geschützt</h2>
+    <p>Bitte Passwort eingeben, um die Karte zu öffnen.</p>
+    <input id="lockPassword" type="password" placeholder="Passwort" autocomplete="off" />
+    <button id="lockSubmit">Öffnen</button>
+    <div class="lock-error" id="lockError"></div>
+  </div>
+</div>
+<span id="lockLink">🔒 sperren</span>
+<div id="app" class="locked">
   <header>
     <div>
       <h1>For Kids – Ausflugsziele-Karte</h1>
@@ -709,6 +743,41 @@ function render() {
 }
 
 render();
+
+// ---------- Lock screen (deterrent only, not real security) ----------
+const LOCK_B64 = 'MTIzNDU2Nzg=';
+const LOCK_KEY = 'kidsmap_unlocked_v1';
+
+function showApp() {
+  document.getElementById('lockScreen').style.display = 'none';
+  document.getElementById('app').classList.remove('locked');
+  setTimeout(() => map.invalidateSize(), 50);
+}
+function lockApp() {
+  try { localStorage.removeItem(LOCK_KEY); } catch (e) {}
+  document.getElementById('lockScreen').style.display = 'flex';
+  document.getElementById('app').classList.add('locked');
+  document.getElementById('lockPassword').value = '';
+}
+(() => {
+  let alreadyUnlocked = false;
+  try { alreadyUnlocked = localStorage.getItem(LOCK_KEY) === '1'; } catch (e) {}
+  if (alreadyUnlocked) showApp();
+})();
+document.getElementById('lockSubmit').addEventListener('click', () => {
+  const val = document.getElementById('lockPassword').value;
+  if (btoa(val) === LOCK_B64) {
+    try { localStorage.setItem(LOCK_KEY, '1'); } catch (e) {}
+    document.getElementById('lockError').textContent = '';
+    showApp();
+  } else {
+    document.getElementById('lockError').textContent = 'Falsches Passwort.';
+  }
+});
+document.getElementById('lockPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('lockSubmit').click();
+});
+document.getElementById('lockLink').addEventListener('click', lockApp);
 </script>
 </body>
 </html>
