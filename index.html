@@ -25,44 +25,43 @@
   header {
     background: var(--panel);
     border-bottom: 1px solid var(--border);
-    padding: 10px 16px;
+    padding: 6px 14px;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
     flex-shrink: 0;
   }
-  header h1 { font-size: 16px; margin: 0; font-weight: 700; }
-  header .sub { font-size: 12px; color: var(--text-muted); }
-  .toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  header h1 { font-size: 13.5px; margin: 0; font-weight: 700; display: inline; }
+  header .sub { font-size: 10.5px; color: var(--text-muted); margin-left: 8px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
   .search-box {
-    padding: 6px 10px;
+    padding: 4px 8px;
     border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 13px;
-    min-width: 200px;
+    border-radius: 7px;
+    font-size: 12px;
+    min-width: 180px;
     flex: 1 1 200px;
-    max-width: 320px;
+    max-width: 300px;
   }
   .ai-box {
-    padding: 6px 10px;
+    padding: 4px 8px;
     border: 1px solid var(--accent);
-    border-radius: 8px;
-    font-size: 13px;
-    min-width: 260px;
-    flex: 1 1 260px;
-    max-width: 420px;
+    border-radius: 7px;
+    font-size: 12px;
+    min-width: 220px;
+    flex: 1 1 240px;
+    max-width: 380px;
     background: #f4f9f5;
   }
-  .ai-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
-  .ai-feedback { font-size: 11.5px; color: var(--accent-hover); min-height: 14px; }
-  #chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .ai-feedback { font-size: 10.5px; color: var(--accent-hover); min-height: 12px; }
+  #chips { display: flex; flex-wrap: wrap; gap: 5px; }
   .chip {
     border: 1px solid var(--border);
     background: var(--chip-bg);
     color: var(--text);
-    border-radius: 20px;
-    padding: 5px 12px;
-    font-size: 12.5px;
+    border-radius: 18px;
+    padding: 3px 10px;
+    font-size: 11.5px;
     cursor: pointer;
     white-space: nowrap;
     user-select: none;
@@ -101,32 +100,36 @@
   }
   .route-bar button.secondary { background: none; color: var(--text-muted); border-color: var(--border); }
 
-  table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: 13px; }
-  thead th {
-    position: sticky; top: 0; background: var(--panel);
-    border-bottom: 1px solid var(--border);
-    text-align: left;
-    padding: 8px 10px;
-    cursor: pointer;
-    white-space: nowrap;
-    color: var(--text-muted);
-    font-weight: 600;
-    font-size: 12px;
-    text-transform: uppercase;
-    letter-spacing: 0.02em;
+  .sort-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    font-size: 11.5px; color: var(--text-muted); flex-shrink: 0;
   }
-  thead th.nosort { cursor: default; }
-  thead th:hover { color: var(--text); }
-  thead th.sorted::after { content: " " attr(data-dir); }
-  tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; }
-  tbody tr:hover { background: #f2f5f1; }
-  tbody tr.selected { background: #e3ede3; }
-  tbody tr.visited td.name-cell { color: var(--text-muted); }
-  td { padding: 7px 10px; vertical-align: top; }
-  td.check-cell { text-align: center; cursor: default; padding: 7px 4px; }
-  td.name-cell { font-weight: 600; }
+  .sort-btn {
+    border: 1px solid var(--border); background: var(--panel); color: var(--text-muted);
+    border-radius: 6px; padding: 3px 9px; font-size: 11.5px; cursor: pointer;
+  }
+  .sort-btn.sorted { color: var(--text); border-color: var(--accent); font-weight: 600; }
+  .sort-btn.sorted::after { content: " " attr(data-dir); }
+
+  .card-list { padding: 0; }
+  .row-card {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    padding: 10px 12px;
+  }
+  .row-card:hover { background: #f2f5f1; }
+  .row-card.selected { background: #e3ede3; }
+  .row-card.visited .card-name { color: var(--text-muted); }
+  .card-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .mini-check { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
+  .mini-check input { margin: 0; cursor: pointer; }
+  .card-name { font-weight: 600; font-size: 14px; }
+  .card-meta { margin-top: 4px; font-size: 12.5px; }
+  .card-addr { margin-top: 2px; font-size: 12px; color: var(--text-muted); }
+  .card-note { margin-top: 4px; }
   .visited-tick { color: var(--accent); margin-right: 4px; }
-  td.note-cell { color: var(--text-muted); font-size: 12px; max-width: 220px; }
+  .note-cell { color: var(--text-muted); font-size: 12px; }
   .my-note-row { display: flex; gap: 5px; margin-top: 4px; align-items: center; }
   .my-note-input {
     flex: 1;
@@ -226,15 +229,14 @@
   <header>
     <div>
       <h1>For Kids – Ausflugsziele-Karte</h1>
-      <span class="sub">Karte &amp; Liste deiner gespeicherten Google-Maps-Liste · Fahrzeit ab Schwabach (echte Route) · Stand der Daten: 20.08.2026</span>
+      <span class="sub">Fahrzeit ab Schwabach (echte Route) · Stand: 20.08.2026</span>
     </div>
     <div class="toolbar">
-      <div class="ai-row">
-        <input id="aiSearch" class="ai-box" type="text" placeholder="🔎 Was suchst du? z.B. „Boulderhalle in der Nähe“ oder „Hotel in Österreich“" />
-      </div>
-      <input id="search" class="search-box" type="text" placeholder="…oder einfach Name durchsuchen" />
+      <input id="aiSearch" class="ai-box" type="text" placeholder="🔎 Was suchst du? z.B. „Boulderhalle in der Nähe“" />
+      <input id="search" class="search-box" type="text" placeholder="…oder Name durchsuchen" />
       <div id="chips"></div>
       <span id="visibleCount" class="count-badge"></span>
+      <span id="restoreDeleted" class="count-badge" style="display:none; text-decoration:underline; cursor:pointer;"></span>
       <button class="chip action" id="exportJson">⬇ JSON</button>
       <button class="chip action" id="exportCsv">⬇ CSV</button>
       <button class="chip reset" id="resetFilters">Filter zurücksetzen</button>
@@ -249,22 +251,20 @@
         <button id="openRouteBtn">Route in Google Maps öffnen ↗</button>
         <button id="clearRouteBtn" class="secondary">Auswahl leeren</button>
       </div>
+      <div id="deleteBar" class="route-bar" style="background:#fdecec; border-bottom-color:#e8a3a3;">
+        <span class="delete-count">0 Einträge markiert</span>
+        <button id="deleteSelectedBtn" style="background:#c92a2a; border-color:#c92a2a;">Markierte löschen</button>
+        <button id="clearDeleteBtn" class="secondary">Auswahl leeren</button>
+      </div>
+      <div class="sort-bar">
+        Sortieren:
+        <button class="sort-btn" data-key="name">Name</button>
+        <button class="sort-btn" data-key="rating">Bewertung</button>
+        <button class="sort-btn" data-key="driveMin">Fahrzeit</button>
+        <button class="sort-btn" data-key="addr">Ort</button>
+      </div>
       <div class="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th class="nosort" title="Für Routenplanung auswählen">🧭</th>
-              <th class="nosort" title="Besucht">✓</th>
-              <th data-key="name">Name</th>
-              <th data-key="type">Art</th>
-              <th data-key="rating">Bewertung</th>
-              <th data-key="driveMin">Fahrzeit</th>
-              <th data-key="addr">Ort</th>
-              <th data-key="note">Notiz</th>
-            </tr>
-          </thead>
-          <tbody id="tbody"></tbody>
-        </table>
+        <div id="cardList" class="card-list"></div>
       </div>
     </div>
   </main>
@@ -338,6 +338,14 @@ function formatDuration(min) {
   return h > 0 ? `${h} Std ${m} Min` : `${m} Min`;
 }
 
+// ---------- Deleted entries (hidden per browser, not a real data change) ----------
+const DELETED_KEY = 'kidsmap_deleted_v1';
+function loadDeleted() {
+  try { return new Set(JSON.parse(localStorage.getItem(DELETED_KEY)) || []); } catch (e) { return new Set(); }
+}
+function saveDeleted() { try { localStorage.setItem(DELETED_KEY, JSON.stringify(Array.from(deletedNames))); } catch (e) {} }
+let deletedNames = loadDeleted();
+
 // ---------- State ----------
 let activeGroups = new Set(Object.keys(GROUPS));
 let searchTerm = "";
@@ -346,6 +354,7 @@ let sortDir = 1;
 let selectedIdx = null;
 let aiParsed = null; // result of parseAIQuery(), or null when empty
 let routeSelection = []; // ordered array of DATA indices, for route planning
+let deleteSelection = []; // ordered array of DATA indices, marked for deletion
 
 function parseAIQuery(raw) {
   const q = raw.trim().toLowerCase();
@@ -599,10 +608,39 @@ document.getElementById('clearRouteBtn').addEventListener('click', () => {
   render();
 });
 
-// ---------- Table sorting ----------
-document.querySelectorAll('thead th[data-key]').forEach(th => {
-  th.addEventListener('click', () => {
-    const key = th.dataset.key;
+// ---------- Delete selection ----------
+function updateDeleteBar() {
+  const bar = document.getElementById('deleteBar');
+  if (deleteSelection.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  bar.querySelector('.delete-count').textContent = deleteSelection.length + (deleteSelection.length === 1 ? ' Eintrag markiert' : ' Einträge markiert');
+}
+document.getElementById('deleteSelectedBtn').addEventListener('click', () => {
+  const names = deleteSelection.map(i => DATA[i].name);
+  if (!names.length) return;
+  const ok = confirm(names.length === 1
+    ? `"${names[0]}" aus der Liste entfernen?`
+    : `${names.length} Einträge aus der Liste entfernen?`);
+  if (!ok) return;
+  names.forEach(n => deletedNames.add(n));
+  saveDeleted();
+  deleteSelection = [];
+  render();
+});
+document.getElementById('clearDeleteBtn').addEventListener('click', () => {
+  deleteSelection = [];
+  render();
+});
+document.getElementById('restoreDeleted').addEventListener('click', () => {
+  deletedNames = new Set();
+  saveDeleted();
+  render();
+});
+
+// ---------- Sorting ----------
+document.querySelectorAll('.sort-btn[data-key]').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.key;
     if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
     render();
   });
@@ -610,6 +648,7 @@ document.querySelectorAll('thead th[data-key]').forEach(th => {
 
 // ---------- Filtering / rendering ----------
 function matchesFilter(p) {
+  if (deletedNames.has(p.name)) return false;
   if (aiParsed) {
     if (aiParsed.groups && !aiParsed.groups.has(p.group)) return false;
     if (aiParsed.maxKm != null && (p.driveKm == null || p.driveKm > aiParsed.maxKm)) return false;
@@ -653,8 +692,8 @@ function selectRow(i) {
   }
 }
 
-const tbody = document.getElementById('tbody');
-tbody.addEventListener('change', e => {
+const cardList = document.getElementById('cardList');
+cardList.addEventListener('change', e => {
   const idx = e.target.dataset.idx;
   if (idx == null) return;
   const i = Number(idx);
@@ -683,6 +722,13 @@ tbody.addEventListener('change', e => {
     e.target.value = v == null ? '' : v;
     setUserEntry(p.name, { myRating: v });
     render();
+  } else if (e.target.classList.contains('delete-checkbox')) {
+    if (e.target.checked) {
+      deleteSelection.push(i);
+    } else {
+      deleteSelection = deleteSelection.filter(x => x !== i);
+    }
+    updateDeleteBar();
   }
 });
 
@@ -690,9 +736,9 @@ function render() {
   const effKey = (aiParsed && aiParsed.sortBy) ? aiParsed.sortBy : sortKey;
   const effDir = (aiParsed && aiParsed.sortBy) ? aiParsed.sortDir : sortDir;
 
-  document.querySelectorAll('thead th[data-key]').forEach(th => {
-    th.classList.toggle('sorted', th.dataset.key === effKey);
-    th.dataset.dir = effDir === 1 ? '▲' : '▼';
+  document.querySelectorAll('.sort-btn[data-key]').forEach(btn => {
+    btn.classList.toggle('sorted', btn.dataset.key === effKey);
+    btn.dataset.dir = effDir === 1 ? '▲' : '▼';
   });
 
   const indexed = DATA.map((p, i) => ({ p, i })).filter(x => matchesFilter(x.p));
@@ -705,17 +751,18 @@ function render() {
     if (!visible && map.hasLayer(m)) markerGroup.removeLayer(m);
   });
 
-  tbody.innerHTML = '';
+  cardList.innerHTML = '';
   indexed.forEach(({ p, i }) => {
     const u = getUserEntry(p.name);
-    const tr = document.createElement('tr');
-    if (i === selectedIdx) tr.classList.add('selected');
-    if (u.visited) tr.classList.add('visited');
+    const card = document.createElement('div');
+    card.className = 'row-card';
+    if (i === selectedIdx) card.classList.add('selected');
+    if (u.visited) card.classList.add('visited');
 
     const ratingTxt = (p.rating != null ? `⭐ ${p.rating} (${p.reviews ?? '–'})` : '–')
       + (u.myRating != null ? `<span class="my-rating-badge">🧑 ${u.myRating}/10</span>` : '');
     const driveTxt = p.driveMin != null
-      ? `${formatDuration(p.driveMin)}<br><span style="color:var(--text-muted);font-size:11px;">${p.driveKm} km</span>`
+      ? `${formatDuration(p.driveMin)} <span style="color:var(--text-muted);">(${p.driveKm} km)</span>`
       : '<span class="no-loc">Standort unbekannt</span>';
     const locTxt = p.addr ? p.addr.split(',').slice(-3).join(',').trim() : (p.approx ? '<span class="approx-flag">≈ ungefähr</span>' : '–');
 
@@ -731,25 +778,36 @@ function render() {
       <input class="my-rating-input" type="number" min="1" max="10" step="1" data-idx="${i}" placeholder="⭐?" title="Eigene Bewertung (1-10)" value="${u.myRating != null ? u.myRating : ''}">
     </div>`;
 
-    tr.innerHTML = `
-      <td class="check-cell"><input type="checkbox" class="route-checkbox" data-idx="${i}" ${routeSelection.includes(i) ? 'checked' : ''} ${p.lat == null ? 'disabled' : ''}></td>
-      <td class="check-cell"><input type="checkbox" class="visited-checkbox" data-idx="${i}" ${u.visited ? 'checked' : ''}></td>
-      <td class="name-cell">${escapeHtml(p.name)}</td>
-      <td><span class="type-tag">${escapeHtml(p.type)}</span></td>
-      <td class="rating-cell">${ratingTxt}</td>
-      <td class="dist-cell">${driveTxt}</td>
-      <td>${locTxt}</td>
-      <td class="note-cell">${noteHtml}</td>
+    card.innerHTML = `
+      <div class="card-top">
+        <label class="mini-check" title="Für Routenplanung auswählen"><input type="checkbox" class="route-checkbox" data-idx="${i}" ${routeSelection.includes(i) ? 'checked' : ''} ${p.lat == null ? 'disabled' : ''}> 🧭</label>
+        <label class="mini-check" title="Besucht"><input type="checkbox" class="visited-checkbox" data-idx="${i}" ${u.visited ? 'checked' : ''}> ✓ Besucht</label>
+        <label class="mini-check" title="Zum Löschen markieren"><input type="checkbox" class="delete-checkbox" data-idx="${i}" ${deleteSelection.includes(i) ? 'checked' : ''}> 🗑</label>
+        <span class="card-name">${escapeHtml(p.name)}</span>
+        <span class="type-tag">${escapeHtml(p.type)}</span>
+      </div>
+      <div class="card-meta">${ratingTxt} &nbsp;·&nbsp; ${driveTxt}</div>
+      <div class="card-addr">${locTxt}</div>
+      <div class="card-note">${noteHtml}</div>
     `;
-    tr.addEventListener('click', e => {
-      if (e.target.tagName === 'INPUT') return; // don't hijack checkbox/input clicks
+    card.addEventListener('click', e => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return; // don't hijack checkbox/input clicks
       selectRow(i);
     });
-    tbody.appendChild(tr);
+    cardList.appendChild(card);
   });
 
-  document.getElementById('visibleCount').textContent = `${indexed.length} / ${DATA.length} Orte`;
+  const activeTotal = DATA.length - deletedNames.size;
+  document.getElementById('visibleCount').textContent = `${indexed.length} / ${activeTotal} Orte`;
+  const restoreEl = document.getElementById('restoreDeleted');
+  if (deletedNames.size > 0) {
+    restoreEl.style.display = '';
+    restoreEl.textContent = `${deletedNames.size} gelöscht · wiederherstellen`;
+  } else {
+    restoreEl.style.display = 'none';
+  }
   updateRouteBar();
+  updateDeleteBar();
 }
 
 render();
