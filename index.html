@@ -33,6 +33,7 @@
   }
   header h1 { font-size: 13.5px; margin: 0; font-weight: 700; display: inline; }
   header .sub { font-size: 10.5px; color: var(--text-muted); margin-left: 8px; }
+  .stats-bar { font-size: 10.5px; color: var(--accent-hover); font-weight: 600; margin-left: 8px; }
   .toolbar { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
   .search-box {
     padding: 4px 8px;
@@ -236,6 +237,7 @@
     <div>
       <h1>For Kids – Ausflugsziele-Karte</h1>
       <span class="sub">Fahrzeit ab Schwabach (echte Route) · Stand: 20.08.2026</span>
+      <span id="statsBar" class="stats-bar"></span>
     </div>
     <div class="toolbar">
       <input id="aiSearch" class="ai-box" type="text" placeholder="🔎 Was suchst du? z.B. „Boulderhalle in der Nähe“" />
@@ -828,6 +830,11 @@ function render() {
   } else {
     restoreEl.style.display = 'none';
   }
+
+  const visitedCount = DATA.filter(p => !deletedNames.has(p.name) && getUserEntry(p.name).visited).length;
+  document.getElementById('statsBar').textContent =
+    `· 📍 ${activeTotal} Orte gesamt · ✅ ${visitedCount} besucht · ⬜ ${activeTotal - visitedCount} noch nicht besucht`;
+
   updateRouteBar();
   updateDeleteBar();
 }
