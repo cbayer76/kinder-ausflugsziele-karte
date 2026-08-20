@@ -244,7 +244,6 @@
       <input id="search" class="search-box" type="text" placeholder="…oder Name durchsuchen" />
       <div id="chips"></div>
       <span id="visibleCount" class="count-badge"></span>
-      <span id="restoreDeleted" class="count-badge" style="display:none; text-decoration:underline; cursor:pointer;"></span>
       <button class="chip action" id="exportJson">⬇ JSON</button>
       <button class="chip action" id="exportCsv">⬇ CSV</button>
       <button class="chip reset" id="resetFilters">Filter zurücksetzen</button>
@@ -655,12 +654,6 @@ document.getElementById('clearDeleteBtn').addEventListener('click', () => {
   deleteSelection = [];
   render();
 });
-document.getElementById('restoreDeleted').addEventListener('click', () => {
-  deletedNames = new Set();
-  saveDeleted();
-  render();
-});
-
 // ---------- Sorting ----------
 document.querySelectorAll('.sort-btn[data-key]').forEach(btn => {
   btn.addEventListener('click', () => {
@@ -823,13 +816,6 @@ function render() {
 
   const activeTotal = DATA.length - deletedNames.size;
   document.getElementById('visibleCount').textContent = `${indexed.length} / ${activeTotal} Orte`;
-  const restoreEl = document.getElementById('restoreDeleted');
-  if (deletedNames.size > 0) {
-    restoreEl.style.display = '';
-    restoreEl.textContent = `${deletedNames.size} gelöscht · wiederherstellen`;
-  } else {
-    restoreEl.style.display = 'none';
-  }
 
   const visitedCount = DATA.filter(p => !deletedNames.has(p.name) && getUserEntry(p.name).visited).length;
   document.getElementById('statsBar').textContent =
