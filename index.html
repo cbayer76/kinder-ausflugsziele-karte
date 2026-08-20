@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kinder-Ausflugsziele Karte</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --panel: #ffffff;
+    --border: #e2e2e0;
+    --text: #2b2b28;
+    --text-muted: #6b6b66;
+    --accent: #2f6f4f;
+    --accent-hover: #24583e;
+    --chip-bg: #eef0ec;
+    --chip-active-bg: #2f6f4f;
+    --chip-active-text: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; height: 100%; background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 16px; margin: 0; font-weight: 700; }
+  header .sub { font-size: 12px; color: var(--text-muted); }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .search-box {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    min-width: 200px;
+    flex: 1 1 200px;
+    max-width: 320px;
+  }
+  .ai-box {
+    padding: 6px 10px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    font-size: 13px;
+    min-width: 260px;
+    flex: 1 1 260px;
+    max-width: 420px;
+    background: #f4f9f5;
+  }
+  .ai-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; width: 100%; }
+  .ai-feedback { font-size: 11.5px; color: var(--accent-hover); min-height: 14px; }
+  .chip {
+    border: 1px solid var(--border);
+    background: var(--chip-bg);
+    color: var(--text);
+    border-radius: 20px;
+    padding: 5px 12px;
+    font-size: 12.5px;
+    cursor: pointer;
+    white-space: nowrap;
+    user-select: none;
+    transition: background 0.15s, color 0.15s;
+  }
+  .chip .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+  .chip.active { background: var(--chip-active-bg); color: var(--chip-active-text); border-color: var(--chip-active-bg); }
+  .chip.ai-highlight { box-shadow: 0 0 0 2px #d97706; }
+  .chip.reset, .chip.action { margin-left: 0; background: none; border: 1px solid var(--border); color: var(--text-muted); }
+  .chip.reset { text-decoration: underline; border: none; margin-left: auto; }
+  .count-badge { font-size: 12px; color: var(--text-muted); margin-left: 4px; }
+
+  main { flex: 1; display: flex; min-height: 0; }
+  #map-pane { flex: 1 1 55%; min-width: 280px; }
+  #list-pane { flex: 1 1 45%; min-width: 320px; display: flex; flex-direction: column; background: var(--panel); border-left: 1px solid var(--border); }
+  .table-scroll { flex: 1; overflow: auto; }
+
+  .route-bar {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    background: #fff7e6;
+    border-bottom: 1px solid #f0c36d;
+    font-size: 13px;
+    flex-shrink: 0;
+  }
+  .route-bar button {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .route-bar button.secondary { background: none; color: var(--text-muted); border-color: var(--border); }
+
+  table { width: 100%; min-width: 820px; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    position: sticky; top: 0; background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    padding: 8px 10px;
+    cursor: pointer;
+    white-space: nowrap;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+  thead th.nosort { cursor: default; }
+  thead th:hover { color: var(--text); }
+  thead th.sorted::after { content: " " attr(data-dir); }
+  tbody tr { border-bottom: 1px solid var(--border); cursor: pointer; }
+  tbody tr:hover { background: #f2f5f1; }
+  tbody tr.selected { background: #e3ede3; }
+  tbody tr.visited td.name-cell { color: var(--text-muted); }
+  td { padding: 7px 10px; vertical-align: top; }
+  td.check-cell { text-align: center; cursor: default; padding: 7px 4px; }
+  td.name-cell { font-weight: 600; }
+  .visited-tick { color: var(--accent); margin-right: 4px; }
+  td.note-cell { color: var(--text-muted); font-size: 12px; max-width: 220px; }
+  .my-note-row { display: flex; gap: 5px; margin-top: 4px; align-items: center; }
+  .my-note-input {
+    flex: 1;
+    width: 100%;
+    font-size: 11.5px;
+    padding: 3px 5px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    background: #fbfbfa;
+  }
+  .my-rating-input {
+    width: 40px;
+    flex: 0 0 auto;
+    font-size: 11.5px;
+    padding: 3px 4px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    background: #fbfbfa;
+    text-align: center;
+  }
+  .my-rating-badge { color: var(--accent-hover); font-weight: 600; font-size: 11px; display: block; margin-top: 2px; }
+  .type-tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    background: var(--chip-bg);
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .no-loc { color: #b45309; font-size: 11px; }
+  .approx-flag { color: #b45309; font-size: 11px; }
+  .closed-badge { color: #b45309; font-size: 11.5px; font-weight: 600; }
+  .closed-badge a { color: #b45309; }
+  .rating-cell { white-space: nowrap; }
+  .dist-cell { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+  .leaflet-popup-content { font-size: 13px; min-width: 180px; }
+  .popup-title { font-weight: 700; margin-bottom: 3px; font-size: 14px; }
+  .popup-note { color: #6b6b66; font-style: italic; margin-top: 4px; }
+  .popup-link { display: inline-block; margin-top: 6px; font-size: 12px; }
+
+  @media (max-width: 860px) {
+    main { flex-direction: column; }
+    #map-pane { flex: 0 0 45vh; }
+    #list-pane { flex: 1; border-left: none; border-top: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div>
+      <h1>For Kids – Ausflugsziele-Karte</h1>
+      <span class="sub">Karte &amp; Liste deiner gespeicherten Google-Maps-Liste · Fahrzeit ab Schwabach (echte Route) · Stand der Daten: 20.08.2026</span>
+    </div>
+    <div class="toolbar">
+      <div class="ai-row">
+        <input id="aiSearch" class="ai-box" type="text" placeholder="🔎 Was suchst du? z.B. „Boulderhalle in der Nähe“ oder „Hotel in Österreich“" />
+      </div>
+      <input id="search" class="search-box" type="text" placeholder="…oder einfach Name durchsuchen" />
+      <div id="chips"></div>
+      <span id="visibleCount" class="count-badge"></span>
+      <button class="chip action" id="exportJson">⬇ JSON</button>
+      <button class="chip action" id="exportCsv">⬇ CSV</button>
+      <button class="chip reset" id="resetFilters">Filter zurücksetzen</button>
+    </div>
+    <div id="aiFeedback" class="ai-feedback"></div>
+  </header>
+  <main>
+    <div id="map-pane"></div>
+    <div id="list-pane">
+      <div id="routeBar" class="route-bar">
+        <span class="route-count">0 Ziele ausgewählt</span>
+        <button id="openRouteBtn">Route in Google Maps öffnen ↗</button>
+        <button id="clearRouteBtn" class="secondary">Auswahl leeren</button>
+      </div>
+      <div class="table-scroll">
+        <table>
+          <thead>
+            <tr>
+              <th class="nosort" title="Für Routenplanung auswählen">🧭</th>
+              <th class="nosort" title="Besucht">✓</th>
+              <th data-key="name">Name</th>
+              <th data-key="type">Art</th>
+              <th data-key="rating">Bewertung</th>
+              <th data-key="driveMin">Fahrzeit</th>
+              <th data-key="addr">Ort</th>
+              <th data-key="note">Notiz</th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ---------- Data ----------
+const SCHWABACH = { lat: 49.3346915, lon: 11.0294139 };
+
+const DATA = [{"name":"Skatepark","type":"Skatepark","group":"Freizeitpark","rating":4.8,"reviews":11,"note":"","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"FUNSPACE Flachau","type":"Freizeitpark","group":"Freizeitpark","rating":4.0,"reviews":25,"note":"","lat":47.3438501,"lon":13.3922888,"distanceKm":281.9,"approx":true,"addr":"","driveKm":370.8,"driveMin":219},{"name":"Excalibur City","type":"Einkaufszentrum","group":"Sonstiges","rating":4.2,"reviews":13489,"note":"","lat":47.9973956,"lon":16.8608307,"distanceKm":453.2,"approx":true,"addr":"","driveKm":557.2,"driveMin":332},{"name":"Rodelbahn St. Englmar GmbH","type":"Freizeitpark","group":"Freizeitpark","rating":4.7,"reviews":7982,"note":"","lat":49.0116496,"lon":12.7977890,"distanceKm":133.5,"approx":false,"addr":"Rodel- und Freizeitparadies St. Englmar, St 2139, Grün, Klinglbach, Sankt Englmar, Landkreis Straubing-Bogen, Bayern, 94379, Deutschland","driveKm":171.9,"driveMin":108},{"name":"BillyBird Park Hemelrijk","type":"Freizeitpark","group":"Freizeitpark","rating":4.5,"reviews":5033,"note":"","lat":51.6345209,"lon":5.6773547,"distanceKm":456.7,"approx":false,"addr":"BillyBird Park Hemelrijk, Schuttersweg, Oosterens, Volkel, Maashorst, Noord-Brabant, Nederland, 5408 SP, Nederland","driveKm":591,"driveMin":356},{"name":"Vakantiepark Capfun - Stoetenslagh","type":"Campingplatz","group":"Camping","rating":4.2,"reviews":2194,"note":"","lat":52.5843057,"lon":6.5349014,"distanceKm":479,"approx":false,"addr":"","driveKm":627,"driveMin":380},{"name":"Tegernsee Phantastisch","type":"Freizeitpark","group":"Freizeitpark","rating":4.2,"reviews":534,"note":"","lat":47.7099191,"lon":11.7543337,"distanceKm":188.4,"approx":false,"addr":"Tegernsee, Landkreis Miesbach, Bayern, 83684, Deutschland","driveKm":222.2,"driveMin":136},{"name":"Rulantica","type":"Erlebnisbad","group":"Bad & Wellness","rating":4.4,"reviews":26812,"note":"","lat":48.2598967,"lon":7.7407439,"distanceKm":268.9,"approx":false,"addr":"Rulantica, 1, Roland-Mack-Ring, Rust, VVG der Stadt Ettenheim, Ortenaukreis, Baden-Württemberg, 77977, Deutschland","driveKm":332.2,"driveMin":193},{"name":"Wellton Riverside SPA Hotel","type":"4-Sterne-Hotel","group":"Hotel","rating":4.4,"reviews":3835,"note":"","lat":56.9451274,"lon":24.1080591,"distanceKm":1211.6,"approx":false,"addr":"Wellton Riverside SPA Hotel, 33, 11. novembra krastmala, Vecrīga, Latgales apkaime, Rīga, LV-1050, Latvija","driveKm":1644.6,"driveMin":1038},{"name":"Skalka Family Park","type":"Vergnügungszentrum","group":"Freizeitpark","rating":4.5,"reviews":2997,"note":"","lat":49.8182081,"lon":18.1384155,"distanceKm":515.2,"approx":false,"addr":"Skalka family park, Vřesinská, Vřesina, okres Ostrava-město, Moravskoslezský kraj, 742 85, Česko","driveKm":656.3,"driveMin":387},{"name":"Vakantiepark Capfun - Wondermolen","type":"Campingplatz","group":"Camping","rating":4.2,"reviews":1730,"note":"","lat":51.5774612,"lon":4.8953736,"distanceKm":500.5,"approx":false,"addr":"","driveKm":644.6,"driveMin":389},{"name":"Hofis Erlebnispark","type":"Freizeitpark","group":"Freizeitpark","rating":4.7,"reviews":991,"note":"","lat":48.3989671,"lon":11.0734191,"distanceKm":104.1,"approx":false,"addr":"Hofis Erlebnispark, 3, Neulwirth, Laimering, Dasing, Landkreis Aichach-Friedberg, Bayern, 86453, Deutschland","driveKm":153.4,"driveMin":100},{"name":"Spa & Resort Bachmair Weissach","type":"5-Sterne-Hotel","group":"Hotel","rating":4.6,"reviews":798,"note":"","lat":47.6936984,"lon":11.7697826,"distanceKm":190.4,"approx":false,"addr":"See-Apartments Bachmair Weissach, 8, Seestraße, Egern, Rottach-Egern, Landkreis Miesbach, Bayern, 83700, Deutschland","driveKm":225.1,"driveMin":140},{"name":"SENSAPOLIS","type":"Indoorspielplatz","group":"Indoor-Spielplatz","rating":3.9,"reviews":3626,"note":"","lat":48.6892588,"lon":8.9888624,"distanceKm":165.2,"approx":false,"addr":"Sensapolis, 1, Melli-Beese-Straße, Am Wall, Flugfeld, Sindelfingen (Stadt), Sindelfingen, Landkreis Böblingen, Baden-Württemberg, 71063, Deutschland","driveKm":206.1,"driveMin":132},{"name":"Hotel Landhaus zur Ohe GmbH","type":"4-Sterne-Hotel","group":"Hotel","rating":4.8,"reviews":535,"note":"Sehr schön, toller Außenbereich.","lat":48.8236287,"lon":13.3423907,"distanceKm":177.8,"approx":false,"addr":"Landhaus zur Ohe, 1, Maukenreuth, Mitternach, Schönberg, Schönberg (VGem), Landkreis Freyung-Grafenau, Bayern, 94513, Deutschland","driveKm":218.5,"driveMin":136},{"name":"Wollhouse Play Zone Indoor spielplatz","type":"Indoorspielplatz","group":"Indoor-Spielplatz","rating":4.4,"reviews":203,"note":"","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"Eierfärberei Beham GmbH","type":"Sonstiges","group":"Sonstiges","rating":4.7,"reviews":394,"note":"Vorübergehend geschlossen","lat":47.6408949,"lon":13.6164800,"distanceKm":268,"approx":true,"addr":"","driveKm":382.8,"driveMin":238},{"name":"Irrland","type":"Freizeitpark","group":"Freizeitpark","rating":4.8,"reviews":24171,"note":"","lat":52.1097603,"lon":8.9588356,"distanceKm":341.2,"approx":true,"addr":"","driveKm":489.5,"driveMin":290},{"name":"Adventure Camp Schnitzmühle","type":"Hotel","group":"Hotel","rating":4.4,"reviews":2730,"note":"","lat":49.0696114,"lon":12.9126057,"distanceKm":140,"approx":false,"addr":"Adventure Camp Schnitzmühle, 1, Schnitzmühle, Fischaitnach, Grossenau, Viechtach, Landkreis Regen, Bayern, 94234, Deutschland","driveKm":187.5,"driveMin":121},{"name":"Familotel Borchard's Rookhus","type":"4-Sterne-Hotel","group":"Hotel","rating":4.9,"reviews":288,"note":"","lat":53.3014843,"lon":12.9342471,"distanceKm":460.5,"approx":false,"addr":"Familotel Borchard's Rookhus, 12, Am Labus, Wesenberg, Mecklenburgische Kleinseenplatte, Mecklenburgische Seenplatte, Mecklenburg-Vorpommern, 17255, Deutschland","driveKm":545.4,"driveMin":352},{"name":"Familienhotel Weimar","type":"4-Sterne-Hotel","group":"Hotel","rating":4.6,"reviews":167,"note":"","lat":50.9775843,"lon":11.3295970,"distanceKm":183.9,"approx":false,"addr":"Familienhotel Weimar, Seifengasse, Altstadt, Weimar, Thüringen, 99423, Deutschland","driveKm":257.8,"driveMin":159},{"name":"Feldberger Hof","type":"4-Sterne-Hotel","group":"Hotel","rating":4.7,"reviews":2156,"note":"","lat":47.8601731,"lon":8.0367632,"distanceKm":274.4,"approx":false,"addr":"Feldberger Hof, 1, Dr.-Pilet-Spur, Feldberg (Ort), Feldberg (Schwarzwald), VVG der Gemeinde Schluchsee, Landkreis Breisgau-Hochschwarzwald, Baden-Württemberg, 79868, Deutschland","driveKm":355.9,"driveMin":227},{"name":"Familotel Sonnenpark","type":"4-Sterne-Hotel","group":"Hotel","rating":4.8,"reviews":1350,"note":"","lat":51.2955791,"lon":8.6042939,"distanceKm":277.8,"approx":false,"addr":"Familotel Sonnenpark, 4a, Sonnenweg, Stryck, Willingen, Willingen (Upland), Landkreis Waldeck-Frankenberg, Hessen, 34508, Deutschland","driveKm":387.9,"driveMin":257},{"name":"Alpenrose – Familux Resort","type":"4-Sterne-Hotel","group":"Hotel","rating":4.8,"reviews":1166,"note":"","lat":47.4532437,"lon":10.2697929,"distanceKm":216.6,"approx":true,"addr":"","driveKm":290.4,"driveMin":174},{"name":"Oberjoch – Familux Resort","type":"4-Sterne-Hotel","group":"Hotel","rating":4.8,"reviews":1871,"note":"","lat":47.5161361,"lon":10.4009786,"distanceKm":207.5,"approx":false,"addr":"Oberjoch – Familux Resort, 3, Am Prinzenwald, Oberes Dorf, Oberjoch, Bad Hindelang, Landkreis Oberallgäu, Bayern, 87541, Deutschland","driveKm":284.9,"driveMin":169},{"name":"The Grand Green - Familux Resort","type":"Hotel","group":"Hotel","rating":4.9,"reviews":1051,"note":"","lat":50.7058739,"lon":10.7217915,"distanceKm":154,"approx":false,"addr":"The Grand Green, 4, Tambacher Straße, Oberhof, Landkreis Schmalkalden-Meiningen, Thüringen, 98559, Deutschland","driveKm":205.8,"driveMin":130},{"name":"Erlebnishof Reiner","type":"Resort-Hotel","group":"Hotel","rating":4.7,"reviews":262,"note":"","lat":49.0169484,"lon":12.7843135,"distanceKm":132.4,"approx":false,"addr":"Erlebnishof Reiner, Maibrunn, Klinglbach, Sankt Englmar, Landkreis Straubing-Bogen, Bayern, 94379, Deutschland","driveKm":173.2,"driveMin":107},{"name":"Lunapark Babylon","type":"Freizeitpark","group":"Freizeitpark","rating":3.7,"reviews":504,"note":"","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"AKI Family Resort Plose","type":"5-Sterne-Hotel","group":"Hotel","rating":4.9,"reviews":208,"note":"","lat":46.6824241,"lon":11.6644130,"distanceKm":298.7,"approx":false,"addr":"Aki Family Resort Plose, Kojaweg - Via Koja, Mellaun - Meluno, Klerant - Cleran, Brixen - Bressanone, Eisacktal - Valle Isarco, Bolzano - Bozen, Trentino-Alto Adige/Südtirol, 39042, Italia","driveKm":418.5,"driveMin":284},{"name":"HUP","type":"4-Sterne-Hotel","group":"Hotel","rating":4.2,"reviews":2090,"note":"","lat":51.4509054,"lon":5.6297187,"distanceKm":449.2,"approx":false,"addr":"HUP, 3, Arkweg, De Smaale, Bekelaar, Mierlo, Geldrop-Mierlo, Noord-Brabant, Nederland, 5731 PD, Nederland","driveKm":583.5,"driveMin":345},{"name":"Rossini-Zentrum","type":"Sonstiges","group":"Sonstiges","rating":null,"reviews":null,"note":"","lat":48.1050901,"lon":11.7872454,"distanceKm":147.6,"approx":false,"addr":"Malo Meze – Balkan Tapas, 17, Rossinistraße, Bayernbodensiedlung II, Baldham, Vaterstetten, Landkreis Ebersberg, Bayern, 85598, Deutschland","driveKm":176.9,"driveMin":105},{"name":"Schloss Kaltenberg Weihnachtsmarkt","type":"Freizeitpark","group":"Freizeitpark","rating":4.4,"reviews":795,"note":"Vorübergehend geschlossen","lat":48.1316977,"lon":10.9938174,"distanceKm":133.8,"approx":false,"addr":"Schloss Kaltenberg, 8, Schloßstraße, Dürnast, Kaltenberg, Geltendorf, Landkreis Landsberg am Lech, Bayern, 82269, Deutschland","driveKm":168.6,"driveMin":126},{"name":"MAXX Arena","type":"Trampolinpark","group":"Sport","rating":4.4,"reviews":3617,"note":"Trampolinhalle mit 14 Trampolinflächen plus Kletterwand & Softplay-Bereich","lat":48.1877167,"lon":11.3846933,"distanceKm":130.2,"approx":false,"addr":"Maxx Arena, 28, Industriestraße, Gröbenzell, Landkreis Fürstenfeldbruck, Bayern, 82194, Deutschland","driveKm":173,"driveMin":105},{"name":"Irrlandia - der MitMachPark","type":"Freizeitpark","group":"Freizeitpark","rating":4.5,"reviews":5330,"note":"","lat":52.2657088,"lon":13.9353237,"distanceKm":384.5,"approx":false,"addr":"Irrlandia - Der Mitmachpark, 2, Lebbiner Straße, Storkow (Mark), Oder-Spree, Brandenburg, 15859, Deutschland","driveKm":473.2,"driveMin":275},{"name":"JUMP FAMILY Zličín","type":"Kinderspielparadies","group":"Indoor-Spielplatz","rating":4.3,"reviews":234,"note":"","lat":50.0648300,"lon":14.2858099,"distanceKm":247.8,"approx":true,"addr":"","driveKm":285.9,"driveMin":165},{"name":"Herníčka Pojď si hrát","type":"Kinderspielparadies","group":"Indoor-Spielplatz","rating":4.8,"reviews":122,"note":"","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"Areál Vltavanů 229","type":"Spielplatz","group":"Spielplatz","rating":4.7,"reviews":672,"note":"","lat":50.0285662,"lon":14.4030643,"distanceKm":254.7,"approx":false,"addr":"Areál VLTAVANŮ 229, 229, Vltavanů, Hodkovičky, Praha 4, obvod Praha 4, Praha, 146 00, Česko","driveKm":297.3,"driveMin":176},{"name":"Rodinný zábavní park Superland","type":"Vergnügungszentrum","group":"Freizeitpark","rating":4.5,"reviews":1496,"note":"","lat":50.0469258,"lon":14.3545272,"distanceKm":251.9,"approx":false,"addr":"","driveKm":289.6,"driveMin":170},{"name":"Jumania Coffee + Kids Play Lounge","type":"Indoorspielplatz","group":"Indoor-Spielplatz","rating":4.8,"reviews":94,"note":"Vorübergehend geschlossen","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"Hildes Backwut","type":"Bäckerei","group":"Sonstiges","rating":4.8,"reviews":1013,"note":"","lat":49.4455432,"lon":11.0745098,"distanceKm":12.8,"approx":false,"addr":"Hildes Backwut, 6, Lessingstraße, Tafelhof, Altstadt und engere Innenstadt, Nürnberg, Bayern, 90443, Deutschland","driveKm":23.8,"driveMin":21},{"name":"Bommelwereld","type":"Freizeitpark","group":"Freizeitpark","rating":4.5,"reviews":782,"note":"","lat":52.0416614,"lon":6.6277975,"distanceKm":432,"approx":false,"addr":"Bommelwereld, Industrieweg, Groenlo, Oost Gelre, Gelderland, Nederland, 7141 DH, Nederland","driveKm":581.3,"driveMin":356},{"name":"Dinosaurier im Himmelsgarten","type":"Sehenswürdigkeit","group":"Museum & Sehenswürdigkeit","rating":4.7,"reviews":276,"note":"","lat":49.0417630,"lon":11.1553345,"distanceKm":33.8,"approx":true,"addr":"","driveKm":53.9,"driveMin":43},{"name":"Monkey Town Fürth | Indoor Spielplatz","type":"Indoorspielplatz","group":"Indoor-Spielplatz","rating":4.5,"reviews":3169,"note":"","lat":49.4606936,"lon":11.0070415,"distanceKm":14.1,"approx":false,"addr":"Monkey Town, 80, Leyher Straße, Südstadt, Süd, Fürth, Bayern, 90763, Deutschland","driveKm":27.7,"driveMin":24},{"name":"Freizeit- und Campinganlage Gaissach","type":"Campingplatz","group":"Camping","rating":4.5,"reviews":510,"note":"","lat":47.7465312,"lon":11.5795392,"distanceKm":181.2,"approx":true,"addr":"","driveKm":223.1,"driveMin":136},{"name":"MovinGround","type":"Park","group":"Freizeitpark","rating":4.1,"reviews":1070,"note":"","lat":49.2815807,"lon":12.1721683,"distanceKm":83.1,"approx":false,"addr":"Beach Clup Movinground, Zufahrt Wasserwacht, Steinberg am See, Wackersdorf (VGem), Landkreis Schwandorf, Bayern, 92449, Deutschland","driveKm":101.4,"driveMin":66},{"name":"Toverland","type":"Freizeitpark","group":"Freizeitpark","rating":4.6,"reviews":33724,"note":"","lat":51.3982068,"lon":5.9838255,"distanceKm":425,"approx":false,"addr":"Toverland, 2, Toverlaan, Sevenum, Horst aan de Maas, Limburg, Nederland, 5975 MR, Nederland","driveKm":557.7,"driveMin":323},{"name":"Südsee-Camp","type":"Campingplatz","group":"Camping","rating":4.4,"reviews":8468,"note":"","lat":52.9349039,"lon":9.9668442,"distanceKm":407.1,"approx":false,"addr":"Südsee-Camp, K 41, Wietzendorf, Heidekreis, Niedersachsen, 29649, Deutschland","driveKm":569.3,"driveMin":335},{"name":"Züricher Park","type":"Park","group":"Spielplatz","rating":4.3,"reviews":83,"note":"","lat":49.4389756,"lon":11.0261424,"distanceKm":11.6,"approx":false,"addr":"Züricher Park, Großreuth b. Schweinau, Westliche Außenstadt, Nürnberg, Bayern, Deutschland","driveKm":24.4,"driveMin":22},{"name":"Mama Cafe","type":"Sonstiges","group":"Sonstiges","rating":4.3,"reviews":311,"note":"Vorübergehend geschlossen","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"Kindermuseum Nürnberg im Kachelbau","type":"Museum","group":"Museum & Sehenswürdigkeit","rating":4.7,"reviews":845,"note":"Vorübergehend geschlossen","lat":49.4538720,"lon":11.0772980,"distanceKm":13.7,"approx":true,"addr":"","driveKm":25.1,"driveMin":24},{"name":"TOBOGA Fantasy Praha","type":"Kinderspielparadies","group":"Indoor-Spielplatz","rating":4.5,"reviews":2551,"note":"","lat":50.0499519,"lon":14.2982528,"distanceKm":248.2,"approx":false,"addr":"Toboga Fantasy, 5a, Skandinávská, Homepark Zličín, Stodůlky, Praha 13, obvod Praha 5, Praha, 155 21, Česko","driveKm":284.7,"driveMin":163},{"name":"Majaland Praha","type":"Vergnügungszentrum","group":"Freizeitpark","rating":4.5,"reviews":2956,"note":"","lat":50.1259573,"lon":14.2839522,"distanceKm":249.9,"approx":false,"addr":"Majaland, 421, Ke Kopanině, Tuchoměřice, okres Praha-západ, Středočeský kraj, 252 67, Česko","driveKm":293.1,"driveMin":171},{"name":"Safari Park Dvůr Králové","type":"Zoo","group":"Museum & Sehenswürdigkeit","rating":4.6,"reviews":38718,"note":"","lat":50.4319053,"lon":15.8139947,"distanceKm":363.8,"approx":true,"addr":"","driveKm":440.2,"driveMin":271},{"name":"Schlossergasse 40, Brixen","type":"Sonstiges","group":"Sonstiges","rating":null,"reviews":null,"note":"","lat":46.7164130,"lon":11.6577920,"distanceKm":294.9,"approx":true,"addr":"","driveKm":412.9,"driveMin":274},{"name":"Techmania Science Center","type":"Sehenswürdigkeit","group":"Museum & Sehenswürdigkeit","rating":4.6,"reviews":1994,"note":"","lat":49.7401732,"lon":13.3620675,"distanceKm":174.3,"approx":false,"addr":"Techmania Science Center, Emila Škody, Škoda, Bory, Plzeň 3, Plzeň, okres Plzeň-město, Plzeňský kraj, Jihozápad, 301 00, Česko","driveKm":201.3,"driveMin":119},{"name":"Indoorspielplatz Zauberland Wörnitz","type":"Indoorspielplatz","group":"Indoor-Spielplatz","rating":4.9,"reviews":393,"note":"","lat":49.2588395,"lon":10.2437754,"distanceKm":57.6,"approx":false,"addr":"Zauberland Wörnitz, 8, Hammerstatt, Gewerbegebiet Hammerstatt, Riedenberg, Oberwörnitz, Wörnitz, Schillingsfürst (VGem), Landkreis Ansbach, Bayern, 91637, Deutschland","driveKm":68,"driveMin":43},{"name":"Funtasia Kinderland Dinkelsbühl","type":"Indoorspielplatz","group":"Indoor-Spielplatz","rating":4.3,"reviews":762,"note":"","lat":49.0658957,"lon":10.3093435,"distanceKm":60.3,"approx":false,"addr":"Funtasia Kinderland, 21, Ellwanger Straße, Gaismühle, Rain, Dinkelsbühl, Landkreis Ansbach, Bayern, 91550, Deutschland","driveKm":85.4,"driveMin":59},{"name":"Göbel's Hotel Rodenberg","type":"4-Sterne-Hotel","group":"Hotel","rating":4.3,"reviews":1819,"note":"","lat":51.0050259,"lon":9.7339567,"distanceKm":207.4,"approx":false,"addr":"Göbel's Hotel Rodenberg, 98, Heinz-Meise-Straße, Rotenburg an der Fulda, Landkreis Hersfeld-Rotenburg, Hessen, 36199, Deutschland","driveKm":300,"driveMin":190},{"name":"NAWAREUM","type":"Technikmuseum","group":"Museum & Sehenswürdigkeit","rating":4.7,"reviews":586,"note":"","lat":48.8840050,"lon":12.5821304,"distanceKm":123.6,"approx":false,"addr":"NAWAREUM, 23 A, Schulgasse, Hornstorf, Straubing, Bayern, 94315, Deutschland","driveKm":151.9,"driveMin":94},{"name":"SUNRISE Remal Resort","type":"5-Sterne-Hotel","group":"Hotel","rating":4.9,"reviews":10856,"note":"","lat":27.9688783,"lon":34.4138626,"distanceKm":3099.1,"approx":false,"addr":"Sunrise Remal Resort, شارع اتينا, النبق, رأس نصراني, شرم الشيخ, رأس أم سد, جنوب سيناء, 46921, مصر","driveKm":4096,"driveMin":3122},{"name":"Spielplatz","type":"Spielplatz","group":"Spielplatz","rating":4.5,"reviews":6,"note":"","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"Spielplatz am Parkbad","type":"Spielplatz","group":"Spielplatz","rating":4.5,"reviews":92,"note":"","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"Spielplatz Wildbirnenweg","type":"Spielplatz","group":"Spielplatz","rating":3.7,"reviews":3,"note":"","lat":52.4091496,"lon":12.9899167,"distanceKm":368.5,"approx":false,"addr":"Wildbirnenweg, Eiche, Potsdam, Brandenburg, 14469, Deutschland","driveKm":417.6,"driveMin":253},{"name":"Spielplatz Heimkehrerstraße","type":"Spielplatz","group":"Spielplatz","rating":4.7,"reviews":3,"note":"","lat":49.3189858,"lon":11.0319999,"distanceKm":1.8,"approx":false,"addr":"Heimkehrerstraße, Forsthof, Schwabach, Bayern, 91126, Deutschland","driveKm":2.3,"driveMin":4},{"name":"Freischwimmbad Seligenstadt","type":"Schwimmbad","group":"Bad & Wellness","rating":4.2,"reviews":582,"note":"","lat":50.0347055,"lon":8.9593719,"distanceKm":168,"approx":true,"addr":"","driveKm":232.1,"driveMin":133},{"name":"PEPPA PIG Park Günzburg","type":"Freizeitpark","group":"Freizeitpark","rating":3.6,"reviews":2724,"note":"","lat":48.4254380,"lon":10.2971564,"distanceKm":114.4,"approx":false,"addr":"Peppa Pig Park, Legoland-Allee, Deffingen, Leinheim, Günzburg, Landkreis Günzburg, Bayern, 89312, Deutschland","driveKm":178.2,"driveMin":108},{"name":"LEGOLAND Deutschland Resort","type":"Themenpark","group":"Freizeitpark","rating":4.3,"reviews":66551,"note":"","lat":48.4241835,"lon":10.3054252,"distanceKm":114.2,"approx":false,"addr":"Legoland Deutschland Resort, Legoland-Allee, Deffingen, Leinheim, Günzburg, Landkreis Günzburg, Bayern, 89312, Deutschland","driveKm":178.8,"driveMin":110},{"name":"Kinderpark Pinocchio","type":"Indoorspielplatz","group":"Indoor-Spielplatz","rating":4.5,"reviews":2565,"note":"","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"Nerudova 211 Café","type":"Café","group":"Sonstiges","rating":4.9,"reviews":1220,"note":"","lat":50.0886402,"lon":14.4010408,"distanceKm":256.5,"approx":false,"addr":"211/14, Nerudova, Malá Strana, obvod Praha 1, Praha, 118 00, Česko","driveKm":296,"driveMin":180},{"name":"Ottobrunner Str. 61, München","type":"Sonstiges","group":"Sonstiges","rating":null,"reviews":null,"note":"","lat":48.1068738,"lon":11.6214327,"distanceKm":143.3,"approx":false,"addr":"61, Ottobrunner Straße, Ramersdorf, Ramersdorf-Perlach, München, Bayern, 81737, Deutschland","driveKm":171.1,"driveMin":107},{"name":"Ghupft wia Gsprunga","type":"Indoorspielplatz","group":"Indoor-Spielplatz","rating":4.6,"reviews":1266,"note":"","lat":null,"lon":null,"distanceKm":null,"approx":false,"addr":"","driveKm":null,"driveMin":null},{"name":"EurothermenResort Bad Schallerbach","type":"Wellness-Center","group":"Bad & Wellness","rating":4.3,"reviews":7929,"note":"","lat":48.2270769,"lon":13.9184265,"distanceKm":244.9,"approx":false,"addr":"Bad Schallerbach EurothermenResort, Promenade, In der Leithen, Gebersdorf, Bad Schallerbach, Bezirk Grieskirchen, Oberösterreich, 4701, Österreich","driveKm":304.1,"driveMin":179},{"name":"JumpYard Nürnberg","type":"Trampolinpark","group":"Sport","rating":null,"reviews":null,"note":"","lat":49.4694786,"lon":11.1018302,"distanceKm":15.9,"approx":false,"addr":"Mercado, 80, Äußere Bayreuther Straße, Schoppershof, Nordöstliche Außenstadt, Nürnberg, Bayern, 90491, Deutschland","driveKm":23.9,"driveMin":26},{"name":"AIRTIME Trampolinpark Nürnberg","type":"Trampolinpark","group":"Sport","rating":4.6,"reviews":4773,"note":"","lat":49.4770087,"lon":11.1156001,"distanceKm":17,"approx":false,"addr":"70, Klingenhofstraße, Schafhof, Nordöstliche Außenstadt, Nürnberg, Bayern, 90411, Deutschland","driveKm":35.5,"driveMin":28},{"name":"Boulderhalle E4","type":"Boulderhalle","group":"Sport","rating":4.7,"reviews":1514,"note":"","lat":49.4368754,"lon":11.0912612,"distanceKm":12.2,"approx":false,"addr":"Allersberger Straße, Bleiweißviertel, Glockenhof, Weiterer Innenstadtgürtel Süd, Nürnberg, Bayern, 90461, Deutschland","driveKm":20.1,"driveMin":20},{"name":"der Steinbock Boulderhalle","type":"Boulderhalle","group":"Sport","rating":null,"reviews":null,"note":"","lat":49.5743875,"lon":10.9971883,"distanceKm":26.8,"approx":false,"addr":"Der Steinbock Erlangen, 45, Bierlachweg, Stadtrandsiedlung, Bruck, Erlangen, Bayern, 91058, Deutschland","driveKm":50.2,"driveMin":35},{"name":"BLOCKHELDEN Boulderhalle Erlangen","type":"Boulderhalle","group":"Sport","rating":4.5,"reviews":987,"note":"","lat":49.6259995,"lon":10.9415780,"distanceKm":33,"approx":false,"addr":"18, Weisendorfer Straße, Dechsendorf, Erlangen, Bayern, 91056, Deutschland","driveKm":59.6,"driveMin":39},{"name":"BLOCKHELDEN Boulderhalle Bamberg","type":"Boulderhalle","group":"Sport","rating":null,"reviews":null,"note":"","lat":49.9184359,"lon":10.9193459,"distanceKm":65.4,"approx":false,"addr":"Hauptkraft-Postwerkstätten, 211, Memmelsdorfer Straße, Gartenstadt, Bamberg, Bayern, 96052, Deutschland","driveKm":92.3,"driveMin":60},{"name":"Jump-O-Mania Trampolinpark","type":"Trampolinpark","group":"Sport","rating":4.5,"reviews":280,"note":"","lat":49.0116219,"lon":12.0602921,"distanceKm":83.1,"approx":false,"addr":"Funsporthalle Regensburg, 4, Lilienthalstraße, Am Weinberg, Rennplatz, Dechbetten, Regensburg, Bayern, 93049, Deutschland","driveKm":107.8,"driveMin":66},{"name":"ROCK INN Boulderhalle","type":"Boulderhalle","group":"Sport","rating":4.7,"reviews":419,"note":"","lat":49.8009181,"lon":9.9720850,"distanceKm":92.2,"approx":false,"addr":"ROCK INN Boulderhalle, 6, Ohmstraße, Grombühl, Würzburg, Bayern, 97076, Deutschland","driveKm":137,"driveMin":82},{"name":"SkyandSand Trampolinhalle","type":"Trampolinpark","group":"Sport","rating":4.6,"reviews":546,"note":"","lat":49.7303070,"lon":9.9693353,"distanceKm":88.2,"approx":false,"addr":"Trampolinhalle SkyandSand Würzburg, 4, Delpstraße, Gewerbegebiet Heuchelhof-Rottenbauer, Rottenbauer, Würzburg, Bayern, 97084, Deutschland","driveKm":146.8,"driveMin":91},{"name":"Freibad Böblingen","type":"Freibad","group":"Bad & Wellness","rating":null,"reviews":null,"note":"Spielhaus, Kletterturm, Piratenschiff, warmes Babybecken (28°C)","lat":48.6943124,"lon":9.0250885,"distanceKm":162.6,"approx":false,"addr":"Freibad Böblingen, 14, Silberweg, Waldburg, Böblingen (Kernstadt), Böblingen, Landkreis Böblingen, Baden-Württemberg, 71032, Deutschland","driveKm":204.2,"driveMin":131},{"name":"Badezentrum Sindelfingen","type":"Freibad","group":"Bad & Wellness","rating":4.4,"reviews":1861,"note":"106m Wasserrutsche, Piraten-Spritzschiff, Sandspielbereich","lat":48.7179492,"lon":9.0182224,"distanceKm":161.9,"approx":false,"addr":"19, Hohenzollernstraße, Sindelfingen (Stadt), Sindelfingen, Landkreis Böblingen, Baden-Württemberg, 71065, Deutschland","driveKm":200.7,"driveMin":130},{"name":"Leobad","type":"Freibad","group":"Bad & Wellness","rating":null,"reviews":null,"note":"Wasserspielplatz mit Rutsche, Schaukel, Wippe (Mai-Sept.)","lat":48.7855248,"lon":9.0118459,"distanceKm":159.2,"approx":false,"addr":"Leobad, 18, Badstraße, Eltingen, Leonberg, Landkreis Böblingen, Baden-Württemberg, 71229, Deutschland","driveKm":194.4,"driveMin":122},{"name":"Wilhelma","type":"Zoo","group":"Museum & Sehenswürdigkeit","rating":4.5,"reviews":37884,"note":"Zoo & botanischer Garten, ca. 1.200 Tierarten","lat":48.8036523,"lon":9.2063156,"distanceKm":145.3,"approx":false,"addr":"Wilhelma Pforte, 13, Wilhelma, Neckarvorstadt, Bad Cannstatt, Stuttgart, Baden-Württemberg, 70376, Deutschland","driveKm":189.9,"driveMin":124},{"name":"Kindermuseum Junges Schloss","type":"Museum","group":"Museum & Sehenswürdigkeit","rating":null,"reviews":null,"note":"Mitmach-Kindermuseum im Alten Schloss","lat":48.7769678,"lon":9.1796160,"distanceKm":148.4,"approx":false,"addr":"Landesmuseum Württemberg, 6, Schillerplatz, Rathaus, Stuttgart-Mitte, Stuttgart, Baden-Württemberg, 70173, Deutschland","driveKm":191.4,"driveMin":128},{"name":"Freilichtmuseum Beuren","type":"Museum","group":"Museum & Sehenswürdigkeit","rating":null,"reviews":null,"note":"Dorfspielplatz, Streichelzoo, Spielzeug-Stube der 1960er","lat":48.5765955,"lon":9.4142947,"distanceKm":145,"approx":false,"addr":"In den Herbstwiesen, Beuren, VVG der Stadt Neuffen, Landkreis Esslingen, Baden-Württemberg, 72660, Deutschland","driveKm":231.7,"driveMin":143},{"name":"Goldbachanlage (Vogel- und Tierpark)","type":"Park & Tierpark","group":"Spielplatz","rating":null,"reviews":null,"note":"Volieren mit Vögeln/Geflügel plus angrenzendem Spielplatz, kostenlos","lat":48.7042049,"lon":9.0262030,"distanceKm":162,"approx":false,"addr":"Königsberger Straße, Sindelfingen (Stadt), Sindelfingen, Landkreis Böblingen, Baden-Württemberg, 71065, Deutschland","driveKm":202.3,"driveMin":128},{"name":"Freizeitpark Rutesheim","type":"Kletterpark","group":"Sport","rating":null,"reviews":null,"note":"Hochseilgarten mit 20 Parcours, Netzparcours schon ab 2 Jahren, Bogenschießen, Minigolf","lat":48.8123483,"lon":8.9236704,"distanceKm":164,"approx":false,"addr":"Kraxlalm, 2, Am Freizeitpark, Rutesheim, Landkreis Böblingen, Baden-Württemberg, 71277, Deutschland","driveKm":197.2,"driveMin":121},{"name":"Spielplatz am Naturfreundehaus (Waldmensch)","type":"Spielplatz","group":"Spielplatz","rating":null,"reviews":null,"note":"Große Holzfigur 'Waldmensch' mit Rutschtunnel, Wiese, Grillplatz","lat":48.7080757,"lon":9.0404916,"distanceKm":160.9,"approx":false,"addr":"Naturfreundehaus Am Fuchsberg, 40, Ernst-Barlach-Straße, Mönchsbrunnen, Sindelfingen (Stadt), Sindelfingen, Landkreis Böblingen, Baden-Württemberg, 71065, Deutschland","driveKm":202.7,"driveMin":130},{"name":"Stadtgarten Böblingen","type":"Park","group":"Spielplatz","rating":null,"reviews":null,"note":"21 ha Park mit zwei Seen, Wiesen und Kletterspielplätzen","lat":48.6779766,"lon":9.0170767,"distanceKm":163.9,"approx":false,"addr":"Am Stadtgarten, Röhrer Weg, Böblingen (Kernstadt), Böblingen, Landkreis Böblingen, Baden-Württemberg, 71032, Deutschland","driveKm":207.1,"driveMin":135},{"name":"Deutsches Museum – Kinderreich","type":"Technikmuseum","group":"Museum & Sehenswürdigkeit","rating":null,"reviews":null,"note":"1.195 m² Mitmach-Zone für 3-8 Jahre: Wasserspiel, Flaschenzüge, Riesengitarre","lat":48.1313416,"lon":11.5859253,"distanceKm":139.9,"approx":false,"addr":"Blitz, 1, Museumsinsel, Gärtnerplatz, Isarvorstadt, Ludwigsvorstadt-Isarvorstadt, München, Bayern, 80538, Deutschland","driveKm":168.2,"driveMin":105},{"name":"Spielzeugmuseum Nürnberg","type":"Museum","group":"Museum & Sehenswürdigkeit","rating":4.5,"reviews":4595,"note":"Weltbekanntes Spielzeugmuseum: Puppen, Blechspielzeug, Modellbahnen, Lego, Playmobil","lat":49.4546058,"lon":11.0742620,"distanceKm":13.7,"approx":false,"addr":"Spielzeugmuseum, 13, Karlstraße, Altstadt, St. Sebald, Altstadt und engere Innenstadt, Nürnberg, Bayern, 90403, Deutschland","driveKm":24.9,"driveMin":23},{"name":"Technik Museum Sinsheim","type":"Technikmuseum","group":"Museum & Sehenswürdigkeit","rating":4.7,"reviews":37317,"note":"Riesiges Mitmach-Technikmuseum: Concorde, U-Boote, Züge, IMAX","lat":49.2389431,"lon":8.8971815,"distanceKm":155,"approx":false,"addr":"Museumsplatz, Steinsfurt, Sinsheim, VVG der Stadt Sinsheim, Rhein-Neckar-Kreis, Baden-Württemberg, 74889, Deutschland","driveKm":173.7,"driveMin":106},{"name":"experimenta Heilbronn","type":"Wissenschaftsmuseum","group":"Museum & Sehenswürdigkeit","rating":4.7,"reviews":3957,"note":"Deutschlands größtes Science Center mit unzähligen Experimentierstationen","lat":49.1441706,"lon":9.2148391,"distanceKm":133.4,"approx":false,"addr":"Experimenta-Platz, Neckarbogen, Kernstadt, Heilbronn, Baden-Württemberg, 74072, Deutschland","driveKm":150.8,"driveMin":97},{"name":"Kindermuseum München","type":"Museum","group":"Museum & Sehenswürdigkeit","rating":3.9,"reviews":954,"note":"Mitmach-Museum mit wechselnden Themenausstellungen rund ums Spielen und Ausprobieren","lat":48.1329928,"lon":11.6966379,"distanceKm":142.3,"approx":false,"addr":"Kindermuseum München, 10, Willy-Brandt-Allee, Messestadt Riem, Trudering-Riem, München, Bayern, 81829, Deutschland","driveKm":175.5,"driveMin":102},{"name":"Nicolaus-Copernicus-Planetarium Nürnberg","type":"Planetarium","group":"Museum & Sehenswürdigkeit","rating":4.5,"reviews":388,"note":"Sternenprojektor-Planetarium mit familienfreundlichen Astronomie-Shows","lat":49.4479129,"lon":11.0629007,"distanceKm":12.8,"approx":false,"addr":"Nicolaus-Copernicus-Planetarium Nürnberg, 41, Am Plärrer, Gostenhof, Altstadt und engere Innenstadt, Nürnberg, Bayern, 90429, Deutschland","driveKm":24,"driveMin":21},{"name":"Haus der Natur Salzburg","type":"Wissenschaftsmuseum","group":"Museum & Sehenswürdigkeit","rating":4.7,"reviews":13429,"note":"Naturkunde-/Science Center mit Aquarium, Weltraumhalle, Dinosauriern","lat":47.8018019,"lon":13.0391863,"distanceKm":225.6,"approx":false,"addr":"Haus der Natur, 5, Museumsplatz, Altstadt, Salzburg, 5020, Österreich","driveKm":310.7,"driveMin":186},{"name":"Museum der Deutschen Spielzeugindustrie","type":"Museum","group":"Museum & Sehenswürdigkeit","rating":null,"reviews":null,"note":"Spielzeugindustrie-Museum mit eigenem Kindermuseum-Flügel","lat":50.3233164,"lon":11.1221695,"distanceKm":110.1,"approx":false,"addr":"Hindenburgplatz, Ketschenbach, Haarbrücken, Neustadt bei Coburg, Landkreis Coburg, Bayern, 96465, Deutschland","driveKm":153,"driveMin":97},{"name":"Fränkisches Freilandmuseum Bad Windsheim","type":"Freilichtmuseum","group":"Museum & Sehenswürdigkeit","rating":4.7,"reviews":4846,"note":"Großes Freilichtmuseum mit über 120 Gebäuden und Mitmach-Handwerksvorführungen","lat":49.4961124,"lon":10.4220774,"distanceKm":47.5,"approx":false,"addr":"Fränkisches Freilandmuseum, 1, Eisweiherweg, Külsheim, Bad Windsheim, Landkreis Neustadt an der Aisch-Bad Windsheim, Bayern, 91438, Deutschland","driveKm":73.1,"driveMin":61},{"name":"Edwin Scharff Museum","type":"Museum","group":"Museum & Sehenswürdigkeit","rating":null,"reviews":null,"note":"Kunst- und Kindermuseum an der Donau mit interaktiven Mitmach-Stationen","lat":48.3936094,"lon":9.9991009,"distanceKm":129,"approx":false,"addr":"Edwin-Scharff-Museum, 4, Petrusplatz, Stadtmitte, Neu-Ulm, Landkreis Neu-Ulm, Bayern, 89231, Deutschland","driveKm":176.7,"driveMin":110}];
+
+const GROUPS = {
+  "Spielplatz":               { color: "#2f9e44", emoji: "🛝" },
+  "Freizeitpark":              { color: "#e8590c", emoji: "🎢" },
+  "Indoor-Spielplatz":         { color: "#9c36b5", emoji: "🧸" },
+  "Sport":                     { color: "#f59f00", emoji: "🤸" },
+  "Hotel":                     { color: "#1971c2", emoji: "🏨" },
+  "Camping":                   { color: "#7048e8", emoji: "⛺" },
+  "Bad & Wellness":            { color: "#0c8599", emoji: "🌊" },
+  "Museum & Sehenswürdigkeit":{ color: "#c92a2a", emoji: "🏛️" },
+  "Sonstiges":                  { color: "#6b6b66", emoji: "📍" }
+};
+
+// synonyms/keywords for the local "AI" query parser
+const GROUP_KEYWORDS = {
+  "Spielplatz": ["spielplatz","spielplätze","spielplaetze","playground"],
+  "Freizeitpark": ["freizeitpark","freizeitparks","achterbahn","vergnügungspark","vergnuegungspark","erlebnispark","themenpark","freizeit park"],
+  "Indoor-Spielplatz": ["indoor","hallenspielplatz","indoorspielplatz","drinnen","schlechtwetter","regenwetter","spielparadies"],
+  "Sport": ["sport","trampolin","trampolinpark","trampolinhalle","boulder","bouldern","boulderhalle","klettern","kletterhalle","kletterpark","kletterwald","hochseilgarten"],
+  "Hotel": ["hotel","resort","übernachten","uebernachten","übernachtung","uebernachtung","urlaub","unterkunft","familotel"],
+  "Camping": ["camping","campingplatz","zelten","wohnmobil","vakantiepark"],
+  "Bad & Wellness": ["bad","schwimmbad","hallenbad","erlebnisbad","freibad","wellness","spa","schwimmen","baden","thermen"],
+  "Museum & Sehenswürdigkeit": ["museum","sehenswürdigkeit","sehenswuerdigkeit","zoo","tierpark","safari","ausflugsziel","besichtigen","science"],
+  "Sonstiges": ["café","cafe","bäckerei","baeckerei","shopping","einkaufen","einkaufszentrum"]
+};
+const COUNTRY_KEYWORDS = {
+  "deutschland": "Deutschland", "germany": "Deutschland",
+  "österreich": "Österreich", "oesterreich": "Österreich", "austria": "Österreich",
+  "tschechien": "Česko", "tschechei": "Česko", "czech": "Česko",
+  "niederlande": "Nederland", "holland": "Nederland", "netherlands": "Nederland",
+  "italien": "Italia", "italy": "Italia", "südtirol": "Italia", "suedtirol": "Italia",
+  "lettland": "Latvija", "latvia": "Latvija",
+  "ägypten": "مصر", "aegypten": "مصر", "egypt": "مصر"
+};
+const NEAR_KEYWORDS = ["nähe","naehe","nah","nahegelegen","nahe gelegen","kurze fahrt","in der nähe","in der naehe"];
+const RATING_KEYWORDS = ["gut bewertet","top bewertet","beste","top bewertung","hohe bewertung","hoch bewertet"];
+const STOPWORDS = new Set(["ein","eine","einen","der","die","das","in","im","am","an","zu","für","fuer","von","mit","und","oder","was","ich","suche","suchen","gerade","bitte","mal","gibt","es","nach","bei","unter","über","ueber","als","weniger","circa","ca","etwa","ungefähr","ungefaehr","max","maximal","gibts"]);
+
+// ---------- Personal data (visited / own notes), stored in this browser only ----------
+const USERDATA_KEY = 'kidsmap_userdata_v1';
+function loadUserData() {
+  try { return JSON.parse(localStorage.getItem(USERDATA_KEY)) || {}; } catch (e) { return {}; }
+}
+function saveUserData() { try { localStorage.setItem(USERDATA_KEY, JSON.stringify(userData)); } catch (e) { /* localStorage unavailable (e.g. private mode) - keep working in-memory */ } }
+let userData = loadUserData();
+function getUserEntry(name) { return userData[name] || { visited: false, myNote: '', myRating: null }; }
+function setUserEntry(name, patch) {
+  userData[name] = Object.assign({}, getUserEntry(name), patch);
+  saveUserData();
+}
+function escapeHtml(s) {
+  return (s || '').toString()
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function formatDuration(min) {
+  if (min == null) return null;
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  return h > 0 ? `${h} Std ${m} Min` : `${m} Min`;
+}
+
+// ---------- State ----------
+let activeGroups = new Set(Object.keys(GROUPS));
+let searchTerm = "";
+let sortKey = "driveMin";
+let sortDir = 1;
+let selectedIdx = null;
+let aiParsed = null; // result of parseAIQuery(), or null when empty
+let routeSelection = []; // ordered array of DATA indices, for route planning
+
+function parseAIQuery(raw) {
+  const q = raw.trim().toLowerCase();
+  if (!q) return null;
+
+  const result = { groups: null, maxKm: null, country: null, terms: [], sortBy: null, sortDir: 1, explainParts: [] };
+
+  // categories
+  const foundGroups = new Set();
+  Object.entries(GROUP_KEYWORDS).forEach(([group, words]) => {
+    if (words.some(w => q.includes(w))) foundGroups.add(group);
+  });
+  if (foundGroups.size) {
+    result.groups = foundGroups;
+    result.explainParts.push("Kategorie: " + Array.from(foundGroups).join(", "));
+  }
+
+  // country
+  for (const [word, token] of Object.entries(COUNTRY_KEYWORDS)) {
+    if (q.includes(word)) { result.country = token; result.explainParts.push("Land: " + word); break; }
+  }
+
+  // "unter X km" (matched against real driving distance)
+  const kmMatch = q.match(/(\d+)\s*km/);
+  if (kmMatch) {
+    result.maxKm = parseInt(kmMatch[1], 10);
+    result.explainParts.push("max. " + result.maxKm + " km Fahrstrecke");
+  }
+
+  // distance intent -> sort by drive time
+  if (NEAR_KEYWORDS.some(k => q.includes(k))) {
+    result.sortBy = "driveMin"; result.sortDir = 1;
+    result.explainParts.push("sortiert nach Fahrzeit");
+  }
+  // rating intent -> sort by rating desc (wins over distance sort if both mentioned)
+  if (RATING_KEYWORDS.some(k => q.includes(k))) {
+    result.sortBy = "rating"; result.sortDir = -1;
+    result.explainParts.push("sortiert nach Bewertung");
+  }
+
+  // remaining free-text tokens (for name/type/note/address matching)
+  // strip recognised keywords on whole-word boundaries, longest first, so
+  // e.g. "hallenbad" is removed as one word instead of matching the
+  // shorter substring "bad" and leaving a meaningless "hallen" fragment.
+  const escapeRegex = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const allKeywords = [
+    ...Object.values(GROUP_KEYWORDS).flat(),
+    ...Object.keys(COUNTRY_KEYWORDS),
+    ...NEAR_KEYWORDS,
+    ...RATING_KEYWORDS
+  ].sort((a, b) => b.length - a.length);
+
+  let rest = q.replace(/\d+\s*km/g, " ");
+  allKeywords.forEach(w => {
+    rest = rest.replace(new RegExp("\\b" + escapeRegex(w) + "\\b", "gi"), " ");
+  });
+  const terms = rest.split(/[^a-zäöüß0-9]+/i).filter(t => t.length > 2 && !STOPWORDS.has(t));
+  if (terms.length) {
+    result.terms = terms;
+    if (!result.explainParts.length) result.explainParts.push("Suchbegriff: " + terms.join(", "));
+  }
+
+  if (!result.groups && !result.country && result.maxKm == null && !result.terms.length && !result.sortBy) {
+    return null; // nothing recognisable, fall back to plain search
+  }
+  return result;
+}
+
+// ---------- Map setup ----------
+const map = L.map('map-pane', { scrollWheelZoom: true }).setView([SCHWABACH.lat, SCHWABACH.lon], 6);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 19,
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>-Mitwirkende'
+}).addTo(map);
+
+L.circleMarker([SCHWABACH.lat, SCHWABACH.lon], {
+  radius: 7, color: "#1a1a1a", weight: 2, fillColor: "#ffd43b", fillOpacity: 1
+}).addTo(map).bindPopup("<b>Schwabach</b><br>Referenzpunkt für Fahrzeiten");
+
+function makeIcon(group, approx) {
+  const g = GROUPS[group] || GROUPS["Sonstiges"];
+  const dashed = approx ? "border: 2px dashed rgba(0,0,0,0.55);" : "border: 2px solid rgba(0,0,0,0.35);";
+  return L.divIcon({
+    className: "",
+    html: `<div style="background:${g.color};${dashed}width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 1px 3px rgba(0,0,0,0.4);">${g.emoji}</div>`,
+    iconSize: [26, 26],
+    iconAnchor: [13, 13],
+    popupAnchor: [0, -13]
+  });
+}
+
+function gmapsLink(p) {
+  // Coordinates drop a pin at the exact spot; the long, multi-part
+  // reverse-geocoded address strings often fail to resolve to a single
+  // place in Google's search, so prefer lat/lon whenever we have it.
+  if (p.lat != null && p.lon != null) {
+    const q = encodeURIComponent(`${p.lat},${p.lon}`);
+    return `https://www.google.com/maps/search/?api=1&query=${q}`;
+  }
+  const q = encodeURIComponent(p.addr || p.name);
+  return `https://www.google.com/maps/search/?api=1&query=${q}`;
+}
+
+const markers = DATA.map((p, i) => {
+  if (p.lat == null || p.lon == null) return null;
+  const marker = L.marker([p.lat, p.lon], { icon: makeIcon(p.group, p.approx) });
+  const ratingHtml = p.rating != null ? `⭐ ${p.rating} (${p.reviews ?? "–"})` : "keine Bewertung";
+  const driveTxt = p.driveMin != null ? `${formatDuration(p.driveMin)} (${p.driveKm} km) ab Schwabach` : "";
+  marker.bindPopup(`
+    <div class="popup-title">${p.name}</div>
+    <div class="type-tag">${p.type}</div><br/>
+    <div style="margin-top:4px;">${ratingHtml}</div>
+    <div style="margin-top:2px;">${driveTxt}</div>
+    ${p.approx ? '<div class="approx-flag">≈ ungefährer Standort</div>' : ""}
+    ${p.note ? `<div class="popup-note">${p.note}</div>` : ""}
+    <a class="popup-link" href="${gmapsLink(p)}" target="_blank" rel="noopener">In Google Maps öffnen ↗</a>
+  `);
+  marker.on('click', () => selectRow(i, false));
+  return marker;
+});
+
+const markerGroup = L.layerGroup(markers.filter(Boolean)).addTo(map);
+
+// ---------- Chips ----------
+const chipsEl = document.getElementById('chips');
+
+function syncChipVisuals() {
+  document.querySelectorAll('.chip[data-group]').forEach(c => {
+    c.classList.toggle('active', activeGroups.has(c.dataset.group));
+  });
+  const allChip = document.getElementById('chipAll');
+  if (allChip) allChip.classList.toggle('active', activeGroups.size === Object.keys(GROUPS).length);
+}
+
+const allChip = document.createElement('span');
+allChip.className = 'chip active';
+allChip.id = 'chipAll';
+allChip.textContent = 'Alle';
+allChip.addEventListener('click', () => {
+  activeGroups = new Set(Object.keys(GROUPS));
+  syncChipVisuals();
+  render();
+});
+chipsEl.appendChild(allChip);
+
+Object.keys(GROUPS).forEach(g => {
+  const chip = document.createElement('span');
+  chip.className = 'chip active';
+  chip.dataset.group = g;
+  chip.innerHTML = `<span class="dot" style="background:${GROUPS[g].color}"></span>${g}`;
+  chip.addEventListener('click', () => {
+    const allActive = activeGroups.size === Object.keys(GROUPS).length;
+    if (allActive) {
+      // first click narrows down to just this one filter
+      activeGroups = new Set([g]);
+    } else if (activeGroups.has(g)) {
+      activeGroups.delete(g);
+    } else {
+      activeGroups.add(g);
+    }
+    syncChipVisuals();
+    render();
+  });
+  chipsEl.appendChild(chip);
+});
+document.getElementById('resetFilters').addEventListener('click', () => {
+  activeGroups = new Set(Object.keys(GROUPS));
+  document.querySelectorAll('.chip[data-group]').forEach(c => c.classList.remove('ai-highlight'));
+  syncChipVisuals();
+  document.getElementById('search').value = '';
+  document.getElementById('aiSearch').value = '';
+  searchTerm = '';
+  aiParsed = null;
+  document.getElementById('aiFeedback').textContent = '';
+  render();
+});
+document.getElementById('search').addEventListener('input', e => {
+  searchTerm = e.target.value.trim().toLowerCase();
+  render();
+});
+document.getElementById('aiSearch').addEventListener('input', e => {
+  aiParsed = parseAIQuery(e.target.value);
+  const fb = document.getElementById('aiFeedback');
+  document.querySelectorAll('.chip[data-group]').forEach(c => c.classList.remove('ai-highlight'));
+  if (aiParsed) {
+    fb.textContent = "Verstanden als: " + aiParsed.explainParts.join(" · ");
+    if (aiParsed.groups) {
+      document.querySelectorAll('.chip[data-group]').forEach(c => {
+        if (aiParsed.groups.has(c.dataset.group)) c.classList.add('ai-highlight');
+      });
+    }
+  } else if (e.target.value.trim()) {
+    fb.textContent = "Kein bekanntes Muster erkannt – suche als Freitext in Name/Art/Notiz/Ort.";
+  } else {
+    fb.textContent = '';
+  }
+  render();
+});
+
+// ---------- Export ----------
+function triggerDownload(filename, content, mime) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+document.getElementById('exportJson').addEventListener('click', () => {
+  const merged = DATA.map(p => Object.assign({}, p, getUserEntry(p.name)));
+  triggerDownload('kinder-ausflugsziele.json', JSON.stringify(merged, null, 2), 'application/json');
+});
+document.getElementById('exportCsv').addEventListener('click', () => {
+  const cols = ['name','type','group','rating','reviews','driveKm','driveMin','addr','note','visited','myNote','myRating'];
+  const esc = v => {
+    const s = (v == null ? '' : String(v)).replace(/"/g, '""');
+    return /[;"\n]/.test(s) ? `"${s}"` : s;
+  };
+  const rows = [cols.join(';')];
+  DATA.forEach(p => {
+    const u = getUserEntry(p.name);
+    const row = Object.assign({}, p, u);
+    rows.push(cols.map(c => esc(row[c])).join(';'));
+  });
+  triggerDownload('kinder-ausflugsziele.csv', rows.join('\n'), 'text/csv;charset=utf-8');
+});
+
+// ---------- Route planning ----------
+function buildRouteUrl() {
+  const pts = routeSelection.map(i => DATA[i]).filter(p => p && p.lat != null);
+  if (!pts.length) return null;
+  const origin = `${SCHWABACH.lat},${SCHWABACH.lon}`;
+  const destination = `${pts[pts.length - 1].lat},${pts[pts.length - 1].lon}`;
+  const waypoints = pts.slice(0, -1).map(p => `${p.lat},${p.lon}`).join('|');
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
+  if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
+  return url;
+}
+function updateRouteBar() {
+  const bar = document.getElementById('routeBar');
+  if (routeSelection.length === 0) { bar.style.display = 'none'; return; }
+  bar.style.display = 'flex';
+  bar.querySelector('.route-count').textContent = routeSelection.length + (routeSelection.length === 1 ? ' Ziel ausgewählt' : ' Ziele ausgewählt');
+}
+document.getElementById('openRouteBtn').addEventListener('click', () => {
+  const url = buildRouteUrl();
+  if (url) window.open(url, '_blank', 'noopener');
+});
+document.getElementById('clearRouteBtn').addEventListener('click', () => {
+  routeSelection = [];
+  render();
+});
+
+// ---------- Table sorting ----------
+document.querySelectorAll('thead th[data-key]').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.key;
+    if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = 1; }
+    render();
+  });
+});
+
+// ---------- Filtering / rendering ----------
+function matchesFilter(p) {
+  if (aiParsed) {
+    if (aiParsed.groups && !aiParsed.groups.has(p.group)) return false;
+    if (aiParsed.maxKm != null && (p.driveKm == null || p.driveKm > aiParsed.maxKm)) return false;
+    if (aiParsed.country && !(p.addr && p.addr.toLowerCase().includes(aiParsed.country.toLowerCase()))) return false;
+    if (aiParsed.terms.length) {
+      const hay = (p.name + ' ' + p.type + ' ' + (p.note||'') + ' ' + (p.addr||'')).toLowerCase();
+      if (!aiParsed.terms.some(t => hay.includes(t))) return false;
+    }
+    if (searchTerm && !p.name.toLowerCase().includes(searchTerm)) return false;
+    return true;
+  }
+  if (!activeGroups.has(p.group)) return false;
+  if (searchTerm && !p.name.toLowerCase().includes(searchTerm)) return false;
+  return true;
+}
+
+function cmp(a, b, effKey, effDir) {
+  let va = a[effKey], vb = b[effKey];
+  if (effKey === 'driveMin' || effKey === 'driveKm') {
+    va = va == null ? Infinity : va;
+    vb = vb == null ? Infinity : vb;
+  } else if (effKey === 'rating') {
+    va = va == null ? -1 : va;
+    vb = vb == null ? -1 : vb;
+  } else {
+    va = (va || '').toString().toLowerCase();
+    vb = (vb || '').toString().toLowerCase();
+  }
+  if (va < vb) return -1 * effDir;
+  if (va > vb) return 1 * effDir;
+  return 0;
+}
+
+function selectRow(i) {
+  selectedIdx = i;
+  render();
+  const p = DATA[i];
+  if (p.lat != null && markers[i]) {
+    map.setView([p.lat, p.lon], Math.max(map.getZoom(), 10), { animate: true });
+    markers[i].openPopup();
+  }
+}
+
+const tbody = document.getElementById('tbody');
+tbody.addEventListener('change', e => {
+  const idx = e.target.dataset.idx;
+  if (idx == null) return;
+  const i = Number(idx);
+  const p = DATA[i];
+  if (e.target.classList.contains('visited-checkbox')) {
+    setUserEntry(p.name, { visited: e.target.checked });
+    render();
+  } else if (e.target.classList.contains('route-checkbox')) {
+    if (e.target.checked) {
+      if (routeSelection.length >= 9) {
+        e.target.checked = false;
+        alert('Maximal 9 Ziele pro Route (Google-Maps-Limit).');
+        return;
+      }
+      routeSelection.push(i);
+    } else {
+      routeSelection = routeSelection.filter(x => x !== i);
+    }
+    updateRouteBar();
+  } else if (e.target.classList.contains('my-note-input')) {
+    setUserEntry(p.name, { myNote: e.target.value });
+  } else if (e.target.classList.contains('my-rating-input')) {
+    let v = parseInt(e.target.value, 10);
+    if (isNaN(v)) { v = null; }
+    else { v = Math.min(10, Math.max(1, v)); }
+    e.target.value = v == null ? '' : v;
+    setUserEntry(p.name, { myRating: v });
+    render();
+  }
+});
+
+function render() {
+  const effKey = (aiParsed && aiParsed.sortBy) ? aiParsed.sortBy : sortKey;
+  const effDir = (aiParsed && aiParsed.sortBy) ? aiParsed.sortDir : sortDir;
+
+  document.querySelectorAll('thead th[data-key]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.key === effKey);
+    th.dataset.dir = effDir === 1 ? '▲' : '▼';
+  });
+
+  const indexed = DATA.map((p, i) => ({ p, i })).filter(x => matchesFilter(x.p));
+  indexed.sort((a, b) => cmp(a.p, b.p, effKey, effDir));
+
+  markers.forEach((m, i) => {
+    if (!m) return;
+    const visible = matchesFilter(DATA[i]);
+    if (visible && !map.hasLayer(m)) markerGroup.addLayer(m);
+    if (!visible && map.hasLayer(m)) markerGroup.removeLayer(m);
+  });
+
+  tbody.innerHTML = '';
+  indexed.forEach(({ p, i }) => {
+    const u = getUserEntry(p.name);
+    const tr = document.createElement('tr');
+    if (i === selectedIdx) tr.classList.add('selected');
+    if (u.visited) tr.classList.add('visited');
+
+    const ratingTxt = (p.rating != null ? `⭐ ${p.rating} (${p.reviews ?? '–'})` : '–')
+      + (u.myRating != null ? `<span class="my-rating-badge">🧑 ${u.myRating}/10</span>` : '');
+    const driveTxt = p.driveMin != null
+      ? `${formatDuration(p.driveMin)}<br><span style="color:var(--text-muted);font-size:11px;">${p.driveKm} km</span>`
+      : '<span class="no-loc">Standort unbekannt</span>';
+    const locTxt = p.addr ? p.addr.split(',').slice(-3).join(',').trim() : (p.approx ? '<span class="approx-flag">≈ ungefähr</span>' : '–');
+
+    const isClosedNote = p.note && /geschlossen/i.test(p.note);
+    let noteHtml = '';
+    if (isClosedNote) {
+      noteHtml += `<div class="closed-badge">⚠️ ${escapeHtml(p.note)} · <a href="${gmapsLink(p)}" target="_blank" rel="noopener">Status prüfen ↗</a></div>`;
+    } else if (p.note) {
+      noteHtml += `<div>${escapeHtml(p.note)}</div>`;
+    }
+    noteHtml += `<div class="my-note-row">
+      <input class="my-note-input" data-idx="${i}" placeholder="Eigene Notiz…" value="${escapeHtml(u.myNote)}">
+      <input class="my-rating-input" type="number" min="1" max="10" step="1" data-idx="${i}" placeholder="⭐?" title="Eigene Bewertung (1-10)" value="${u.myRating != null ? u.myRating : ''}">
+    </div>`;
+
+    tr.innerHTML = `
+      <td class="check-cell"><input type="checkbox" class="route-checkbox" data-idx="${i}" ${routeSelection.includes(i) ? 'checked' : ''} ${p.lat == null ? 'disabled' : ''}></td>
+      <td class="check-cell"><input type="checkbox" class="visited-checkbox" data-idx="${i}" ${u.visited ? 'checked' : ''}></td>
+      <td class="name-cell">${escapeHtml(p.name)}</td>
+      <td><span class="type-tag">${escapeHtml(p.type)}</span></td>
+      <td class="rating-cell">${ratingTxt}</td>
+      <td class="dist-cell">${driveTxt}</td>
+      <td>${locTxt}</td>
+      <td class="note-cell">${noteHtml}</td>
+    `;
+    tr.addEventListener('click', e => {
+      if (e.target.tagName === 'INPUT') return; // don't hijack checkbox/input clicks
+      selectRow(i);
+    });
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById('visibleCount').textContent = `${indexed.length} / ${DATA.length} Orte`;
+  updateRouteBar();
+}
+
+render();
+</script>
+</body>
+</html>
