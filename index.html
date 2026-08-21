@@ -255,7 +255,7 @@
     <div id="list-pane">
       <div id="routeBar" class="route-bar">
         <span class="route-count">0 Ziele ausgewählt</span>
-        <button id="openRouteBtn">Route in Google Maps öffnen ↗</button>
+        <button id="openRouteBtn">Rundtour in Google Maps öffnen ↗</button>
         <button id="clearRouteBtn" class="secondary">Auswahl leeren</button>
       </div>
       <div id="deleteBar" class="route-bar" style="background:#fdecec; border-bottom-color:#e8a3a3;">
@@ -607,13 +607,13 @@ document.getElementById('exportCsv').addEventListener('click', () => {
 
 // ---------- Route planning ----------
 function buildRouteUrl() {
+  // Always a round trip: Schwabach -> every selected stop, in selection order -> back to Schwabach.
   const pts = routeSelection.map(i => DATA[i]).filter(p => p && p.lat != null);
   if (!pts.length) return null;
-  const origin = `${SCHWABACH.lat},${SCHWABACH.lon}`;
-  const destination = `${pts[pts.length - 1].lat},${pts[pts.length - 1].lon}`;
-  const waypoints = pts.slice(0, -1).map(p => `${p.lat},${p.lon}`).join('|');
-  let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&travelmode=driving`;
-  if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
+  const schwabach = `${SCHWABACH.lat},${SCHWABACH.lon}`;
+  const waypoints = pts.map(p => `${p.lat},${p.lon}`).join('|');
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(schwabach)}&destination=${encodeURIComponent(schwabach)}&travelmode=driving`;
+  url += `&waypoints=${encodeURIComponent(waypoints)}`;
   return url;
 }
 function updateRouteBar() {
