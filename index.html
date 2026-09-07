@@ -55,6 +55,31 @@
     background: #f4f9f5;
   }
   .ai-feedback { font-size: 10.5px; color: var(--accent-hover); min-height: 12px; }
+  .real-ai-bar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 2px; }
+  .real-ai-label { font-size: 10.5px; color: var(--text-muted); white-space: nowrap; }
+  .real-ai-input {
+    padding: 4px 8px;
+    border: 1px solid var(--accent);
+    border-radius: 7px;
+    font-size: 12px;
+    min-width: 220px;
+    flex: 1 1 240px;
+    max-width: 420px;
+    background: #fff8f0;
+  }
+  .real-ai-btn, .real-ai-keybtn, .real-ai-clearbtn {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: #fff;
+    border-radius: 6px;
+    padding: 4px 9px;
+    font-size: 11.5px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .real-ai-keybtn { background: none; color: var(--text-muted); border-color: var(--border); }
+  .real-ai-clearbtn { background: none; color: #c92a2a; border-color: #c92a2a; }
+  .real-ai-feedback { font-size: 10.5px; color: var(--accent-hover); min-height: 12px; flex: 1 1 100%; }
   #chips { display: flex; flex-wrap: wrap; gap: 5px; }
   .chip {
     border: 1px solid var(--border);
@@ -188,7 +213,7 @@
   }
 
   @media (max-width: 600px) {
-    .search-box, .ai-box { flex: 1 1 100%; max-width: 100%; }
+    .search-box, .ai-box, .real-ai-input { flex: 1 1 100%; max-width: 100%; }
     #chips { flex: 1 1 100%; gap: 8px; }
     .chip { font-size: 14px; padding: 8px 16px; }
     .chip .dot { width: 10px; height: 10px; }
@@ -243,12 +268,23 @@
       <input id="aiSearch" class="ai-box" type="text" placeholder="🔎 Was suchst du? z.B. „Boulderhalle in der Nähe“" />
       <input id="search" class="search-box" type="text" placeholder="…oder Name durchsuchen" />
       <div id="chips"></div>
+      <label class="chip" id="mapBoundsLabel" for="mapBoundsToggle" title="Liste auf den aktuell sichtbaren Kartenausschnitt beschränken">
+        <input type="checkbox" id="mapBoundsToggle" style="margin-right:5px; vertical-align:middle;" />🗺️ Nur Kartenausschnitt
+      </label>
       <span id="visibleCount" class="count-badge"></span>
       <button class="chip action" id="exportJson">⬇ JSON</button>
       <button class="chip action" id="exportCsv">⬇ CSV</button>
       <button class="chip reset" id="resetFilters">Filter zurücksetzen</button>
     </div>
     <div id="aiFeedback" class="ai-feedback"></div>
+    <div id="realAiBar" class="real-ai-bar">
+      <span class="real-ai-label">🤖 Echte KI fragen:</span>
+      <input id="realAiInput" class="real-ai-input" type="text" placeholder="z.B. „Was ist im Umkreis von 20 km um München?“" />
+      <button id="realAiAsk" class="real-ai-btn">Fragen</button>
+      <button id="realAiKeyBtn" class="real-ai-keybtn" title="API-Key setzen/ändern">🔑 Key</button>
+      <button id="realAiClear" class="real-ai-clearbtn" style="display:none;">✕ Filter aufheben</button>
+      <span id="realAiFeedback" class="real-ai-feedback"></span>
+    </div>
   </header>
   <main>
     <div id="map-pane"></div>
@@ -362,6 +398,8 @@ let selectedIdx = null;
 let aiParsed = null; // result of parseAIQuery(), or null when empty
 let routeSelection = []; // ordered array of DATA indices, for route planning
 let deleteSelection = []; // ordered array of DATA indices, marked for deletion
+let externalAiNames = null; // Set of DATA names returned by the real-AI query, or null when inactive
+let mapBoundsFilterActive = false; // when true, list is restricted to markers within the current map viewport
 
 function parseAIQuery(raw) {
   const q = raw.trim().toLowerCase();
@@ -452,6 +490,15 @@ const ResetViewControl = L.Control.extend({
   }
 });
 map.addControl(new ResetViewControl());
+
+document.getElementById('mapBoundsToggle').addEventListener('change', e => {
+  mapBoundsFilterActive = e.target.checked;
+  document.getElementById('mapBoundsLabel').classList.toggle('active', mapBoundsFilterActive);
+  render();
+});
+map.on('moveend zoomend', () => {
+  if (mapBoundsFilterActive) render();
+});
 
 L.circleMarker([SCHWABACH.lat, SCHWABACH.lon], {
   radius: 7, color: "#1a1a1a", weight: 2, fillColor: "#ffd43b", fillOpacity: 1
@@ -552,6 +599,13 @@ document.getElementById('resetFilters').addEventListener('click', () => {
   searchTerm = '';
   aiParsed = null;
   document.getElementById('aiFeedback').textContent = '';
+  externalAiNames = null;
+  document.getElementById('realAiInput').value = '';
+  document.getElementById('realAiFeedback').textContent = '';
+  document.getElementById('realAiClear').style.display = 'none';
+  mapBoundsFilterActive = false;
+  document.getElementById('mapBoundsToggle').checked = false;
+  document.getElementById('mapBoundsLabel').classList.remove('active');
   render();
 });
 document.getElementById('search').addEventListener('input', e => {
@@ -603,6 +657,91 @@ document.getElementById('exportCsv').addEventListener('click', () => {
     rows.push(cols.map(c => esc(row[c])).join(';'));
   });
   triggerDownload('kinder-ausflugsziele.csv', rows.join('\n'), 'text/csv;charset=utf-8');
+});
+
+// ---------- Real external-AI query (Claude API, browser-side, personal API key) ----------
+const AI_KEY_STORAGE = 'kidsmap_claude_api_key';
+function getApiKey() { try { return localStorage.getItem(AI_KEY_STORAGE) || ''; } catch (e) { return ''; } }
+function setApiKey(k) { try { k ? localStorage.setItem(AI_KEY_STORAGE, k) : localStorage.removeItem(AI_KEY_STORAGE); } catch (e) {} }
+
+document.getElementById('realAiKeyBtn').addEventListener('click', () => {
+  const current = getApiKey();
+  const masked = current ? `aktueller Key endet auf "…${current.slice(-4)}"` : 'noch kein Key gespeichert';
+  const input = prompt(`Anthropic-API-Key eingeben (wird nur in diesem Browser lokal gespeichert, ${masked}).\nLeer lassen + OK = Key löschen.`, '');
+  if (input === null) return; // cancelled
+  setApiKey(input.trim());
+});
+
+document.getElementById('realAiClear').addEventListener('click', () => {
+  externalAiNames = null;
+  document.getElementById('realAiFeedback').textContent = '';
+  document.getElementById('realAiClear').style.display = 'none';
+  render();
+});
+
+async function askRealAI(question) {
+  const key = getApiKey();
+  const fb = document.getElementById('realAiFeedback');
+  const askBtn = document.getElementById('realAiAsk');
+  if (!key) {
+    fb.textContent = '⚠️ Bitte erst über "🔑 Key" einen Anthropic-API-Key eintragen.';
+    return;
+  }
+  if (!question.trim()) return;
+  fb.textContent = 'Frage wird an Claude gesendet…';
+  askBtn.disabled = true;
+  try {
+    const list = DATA
+      .map((p, i) => (deletedNames.has(p.name) ? null : `${i}|${p.name}|${p.group}|${p.lat != null ? p.lat : ''}|${p.lon != null ? p.lon : ''}|${(p.addr || '').replace(/\|/g, ' ')}`))
+      .filter(Boolean)
+      .join('\n');
+    const prompt = `Du bekommst eine Liste von Ausflugszielen im Format "Index|Name|Kategorie|Breitengrad|Längengrad|Adresse", eine Zeile pro Ort. Beantworte die folgende Frage AUSSCHLIESSLICH anhand dieser Liste - erfinde keine neuen Orte und nutze kein Wissen über Orte, die nicht in der Liste stehen. Für Umkreis-/Entfernungsfragen berechne die Entfernung selbst per Haversine-Formel aus Breitengrad/Längengrad. Orte ohne Koordinaten kannst du für solche Fragen nicht berücksichtigen. Antworte AUSSCHLIESSLICH mit einem JSON-Array der passenden Indizes, ohne jeden weiteren Text, z.B. [3,17,42]. Wenn nichts passt, antworte mit [].\n\nListe:\n${list}\n\nFrage: ${question}`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-api-key': key,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`API-Fehler ${res.status}: ${errText.slice(0, 200)}`);
+    }
+    const data = await res.json();
+    const text = (data.content || []).map(b => b.text || '').join('');
+    const match = text.match(/\[[\s\d,]*\]/);
+    if (!match) throw new Error('Antwort konnte nicht gelesen werden: ' + text.slice(0, 200));
+    const indices = JSON.parse(match[0]);
+    const names = new Set(indices.map(i => DATA[i] && DATA[i].name).filter(Boolean));
+
+    externalAiNames = names;
+    aiParsed = null;
+    document.getElementById('aiSearch').value = '';
+    document.getElementById('aiFeedback').textContent = '';
+    document.querySelectorAll('.chip[data-group]').forEach(c => c.classList.remove('ai-highlight'));
+    fb.textContent = names.size ? `✓ ${names.size} Treffer aus der Liste.` : 'Keine passenden Einträge in der Liste gefunden.';
+    document.getElementById('realAiClear').style.display = 'inline-block';
+    render();
+  } catch (err) {
+    fb.textContent = '⚠️ ' + err.message;
+  } finally {
+    askBtn.disabled = false;
+  }
+}
+
+document.getElementById('realAiAsk').addEventListener('click', () => {
+  askRealAI(document.getElementById('realAiInput').value);
+});
+document.getElementById('realAiInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') askRealAI(e.target.value);
 });
 
 // ---------- Route planning ----------
@@ -666,6 +805,15 @@ document.querySelectorAll('.sort-btn[data-key]').forEach(btn => {
 // ---------- Filtering / rendering ----------
 function matchesFilter(p) {
   if (deletedNames.has(p.name)) return false;
+  if (mapBoundsFilterActive) {
+    if (p.lat == null || p.lon == null) return false;
+    if (!map.getBounds().contains([p.lat, p.lon])) return false;
+  }
+  if (externalAiNames) {
+    if (!externalAiNames.has(p.name)) return false;
+    if (searchTerm && !p.name.toLowerCase().includes(searchTerm)) return false;
+    return true;
+  }
   if (aiParsed) {
     if (aiParsed.groups && !aiParsed.groups.has(p.group)) return false;
     if (aiParsed.maxKm != null && (p.driveKm == null || p.driveKm > aiParsed.maxKm)) return false;
