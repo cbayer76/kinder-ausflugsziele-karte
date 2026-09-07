@@ -517,14 +517,10 @@ function makeIcon(group, approx) {
 }
 
 function gmapsLink(p) {
-  // Coordinates drop a pin at the exact spot; the long, multi-part
-  // reverse-geocoded address strings often fail to resolve to a single
-  // place in Google's search, so prefer lat/lon whenever we have it.
-  if (p.lat != null && p.lon != null) {
-    const q = encodeURIComponent(`${p.lat},${p.lon}`);
-    return `https://www.google.com/maps/search/?api=1&query=${q}`;
-  }
-  const q = encodeURIComponent(p.addr || p.name);
+  // Search by name (+ address when available) so Google Maps resolves to the
+  // actual named place with its info card, instead of just dropping a bare
+  // pin at raw coordinates with no name/reviews/photos attached.
+  const q = encodeURIComponent(p.addr ? `${p.name}, ${p.addr}` : p.name);
   return `https://www.google.com/maps/search/?api=1&query=${q}`;
 }
 
