@@ -170,8 +170,6 @@
   .row-card.selected { background: #e3ede3; }
   .row-card.visited .card-name { color: var(--text-muted); }
   .card-top { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-  .mini-check { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; color: var(--text-muted); cursor: pointer; white-space: nowrap; }
-  .mini-check input { margin: 0; cursor: pointer; }
   .card-name { font-weight: 600; font-size: 14px; }
   .card-meta { margin-top: 4px; font-size: 12.5px; }
   .card-addr { margin-top: 2px; font-size: 12px; color: var(--text-muted); }
@@ -189,18 +187,25 @@
     color: var(--text);
     background: #fbfbfa;
   }
-  .my-rating-input {
-    width: 40px;
-    flex: 0 0 auto;
-    font-size: 11.5px;
-    padding: 3px 4px;
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    color: var(--text);
-    background: #fbfbfa;
-    text-align: center;
-  }
-  .my-rating-badge { color: var(--accent-hover); font-weight: 600; font-size: 11px; display: block; margin-top: 2px; }
+  .d4-top { display: flex; align-items: flex-start; gap: 10px; }
+  .d4-check { cursor: pointer; flex: 0 0 auto; margin-top: 1px; }
+  .d4-check input, .d4-link input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .d4-check .box { width: 22px; height: 22px; border-radius: 6px; border: 1.5px solid #b9b9b2; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; color: transparent; background: #fff; transition: all .12s; }
+  .d4-check input:checked + .box { background: #2f9e44; border-color: #2f9e44; color: #fff; }
+  .d4-check input:focus-visible + .box, .d4-link input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .d4-main { flex: 1; min-width: 0; }
+  .d4-stars { flex: 0 0 auto; display: inline-flex; gap: 1px; white-space: nowrap; }
+  .d4-star { cursor: pointer; font-size: 19px; line-height: 1; color: #d6d6cf; user-select: none; }
+  .d4-star.f { color: #ef9f27; }
+  .d4-star:hover { color: #f5c26b; }
+  .d4-foot { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--border); margin-top: 8px; padding-top: 6px; }
+  .d4-link { cursor: pointer; }
+  .d4-link span { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; color: var(--text-muted); padding: 3px 7px; border-radius: 6px; }
+  .d4-link:hover span { background: #eef1ec; }
+  .d4-link.route input:checked + span { color: #1971c2; background: #e7f0fb; font-weight: 600; }
+  .d4-link.del input:checked + span { color: #c92a2a; background: #fdecec; font-weight: 600; }
+  .d4-link.disabled { opacity: .4; cursor: not-allowed; }
+  .d4-vis { margin-left: auto; font-size: 12px; color: #2f9e44; }
   .type-tag {
     display: inline-block;
     font-size: 11px;
@@ -900,13 +905,6 @@ cardList.addEventListener('change', e => {
     updateRouteBar();
   } else if (e.target.classList.contains('my-note-input')) {
     setUserEntry(p.name, { myNote: e.target.value });
-  } else if (e.target.classList.contains('my-rating-input')) {
-    let v = parseInt(e.target.value, 10);
-    if (isNaN(v)) { v = null; }
-    else { v = Math.min(10, Math.max(1, v)); }
-    e.target.value = v == null ? '' : v;
-    setUserEntry(p.name, { myRating: v });
-    render();
   } else if (e.target.classList.contains('delete-checkbox')) {
     if (e.target.checked) {
       deleteSelection.push(i);
@@ -915,6 +913,15 @@ cardList.addEventListener('change', e => {
     }
     updateDeleteBar();
   }
+});
+
+cardList.addEventListener('click', e => {
+  const star = e.target.closest('.d4-star');
+  if (!star) return;
+  const p = DATA[Number(star.dataset.idx)];
+  const v = Number(star.dataset.n) * 2;
+  setUserEntry(p.name, { myRating: getUserEntry(p.name).myRating === v ? null : v });
+  render();
 });
 
 function render() {
@@ -944,8 +951,7 @@ function render() {
     if (i === selectedIdx) card.classList.add('selected');
     if (u.visited) card.classList.add('visited');
 
-    const ratingTxt = (p.rating != null ? `⭐ ${p.rating} (${p.reviews ?? '–'})` : '–')
-      + (u.myRating != null ? `<span class="my-rating-badge">🧑 ${u.myRating}/10</span>` : '');
+    const ratingTxt = p.rating != null ? `⭐ ${p.rating} (${p.reviews ?? '–'})` : '–';
     const driveTxt = p.driveMin != null
       ? `${formatDuration(p.driveMin)} <span style="color:var(--text-muted);">(${p.driveKm} km)</span>`
       : '<span class="no-loc">Standort unbekannt</span>';
@@ -960,23 +966,30 @@ function render() {
     }
     noteHtml += `<div class="my-note-row">
       <input class="my-note-input" data-idx="${i}" placeholder="Eigene Notiz…" value="${escapeHtml(u.myNote)}">
-      <input class="my-rating-input" type="number" min="1" max="10" step="1" data-idx="${i}" placeholder="⭐?" title="Eigene Bewertung (1-10)" value="${u.myRating != null ? u.myRating : ''}">
     </div>`;
 
+    const starsFilled = u.myRating != null ? Math.ceil(u.myRating / 2) : 0;
+    const starsHtml = [1, 2, 3, 4, 5].map(n => `<span class="d4-star${n <= starsFilled ? ' f' : ''}" data-idx="${i}" data-n="${n}">★</span>`).join('');
     card.innerHTML = `
-      <div class="card-top">
-        <label class="mini-check" title="Für Routenplanung auswählen"><input type="checkbox" class="route-checkbox" data-idx="${i}" ${routeSelection.includes(i) ? 'checked' : ''} ${p.lat == null ? 'disabled' : ''}> 🧭</label>
-        <label class="mini-check" title="Besucht"><input type="checkbox" class="visited-checkbox" data-idx="${i}" ${u.visited ? 'checked' : ''}> ✓ Besucht</label>
-        <label class="mini-check" title="Zum Löschen markieren"><input type="checkbox" class="delete-checkbox" data-idx="${i}" ${deleteSelection.includes(i) ? 'checked' : ''}> 🗑</label>
-        <span class="card-name">${escapeHtml(p.name)}</span>
-        <span class="type-tag">${escapeHtml(p.type)}</span>
+      <div class="d4-top">
+        <label class="d4-check" title="Besucht"><input type="checkbox" class="visited-checkbox" data-idx="${i}" ${u.visited ? 'checked' : ''}><span class="box">✓</span></label>
+        <div class="d4-main">
+          <span class="card-name">${escapeHtml(p.name)}</span>
+          <span class="type-tag">${escapeHtml(p.type)}</span>
+          <div class="card-meta">${ratingTxt} &nbsp;·&nbsp; ${driveTxt}</div>
+          <div class="card-addr">${locTxt}</div>
+        </div>
+        <span class="d4-stars" title="${u.myRating != null ? 'Meine Wertung: ' + u.myRating + '/10' : 'Eigene Wertung vergeben'}">${starsHtml}</span>
       </div>
-      <div class="card-meta">${ratingTxt} &nbsp;·&nbsp; ${driveTxt}</div>
-      <div class="card-addr">${locTxt}</div>
       <div class="card-note">${noteHtml}</div>
+      <div class="d4-foot">
+        <label class="d4-link route${p.lat == null ? ' disabled' : ''}" title="Für Routenplanung auswählen"><input type="checkbox" class="route-checkbox" data-idx="${i}" ${routeSelection.includes(i) ? 'checked' : ''} ${p.lat == null ? 'disabled' : ''}><span>🧭 Zur Route</span></label>
+        <label class="d4-link del" title="Zum Löschen markieren"><input type="checkbox" class="delete-checkbox" data-idx="${i}" ${deleteSelection.includes(i) ? 'checked' : ''}><span>🗑 Löschen</span></label>
+        ${u.visited ? '<span class="d4-vis">✓ Besucht</span>' : ''}
+      </div>
     `;
     card.addEventListener('click', e => {
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'LABEL') return; // don't hijack checkbox/input clicks
+      if (e.target.tagName === 'INPUT' || e.target.closest('label') || e.target.closest('.d4-stars')) return; // don't hijack checkbox/input/star clicks
       selectRow(i);
     });
     cardList.appendChild(card);
