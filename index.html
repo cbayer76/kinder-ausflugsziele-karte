@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kinder-Ausflugsziele Karte</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#3f6b4f">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="For Kids">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <style>
   :root {
@@ -247,6 +254,34 @@
     .chip.reset { margin-left: 0; flex: 1 1 100%; text-align: center; padding: 8px 0; }
     .count-badge { flex: 1 1 100%; }
   }
+  .filter-toggle, .to-top { display: none; }
+  @media (max-width: 600px) {
+    #app { height: 100vh; height: 100dvh; }
+    header { padding: 6px 10px; gap: 4px; }
+    header .sub { display: none; }
+    header h1 { font-size: 14px; }
+    .stats-bar { margin-left: 6px; font-size: 10px; }
+    .filter-toggle { display: flex; justify-content: space-between; align-items: center; width: 100%; margin-top: 6px; min-height: 44px; padding: 0 14px; font-size: 14px; font-weight: 600; color: var(--text); background: var(--chip-bg); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; }
+    .filter-toggle #filterToggleInfo { font-weight: 500; color: var(--accent-hover); }
+    header:not(.open) .toolbar, header:not(.open) #aiFeedback, header:not(.open) #realAiBar { display: none; }
+    header.open { max-height: 72vh; max-height: 72dvh; overflow-y: auto; }
+    main { min-height: 0; }
+    #map-pane { flex: 0 0 36dvh; min-height: 160px; }
+    #list-pane { min-height: 0; position: relative; }
+    .table-scroll { min-height: 0; padding-bottom: 34px; }
+    #lockLink { left: 50%; right: auto; transform: translateX(-50%); bottom: 6px; padding: 4px 12px; background: rgba(255,255,255,.92); border-radius: 12px; }
+    #tablePane { min-height: 0; }
+    .sort-bar { padding: 6px 10px; }
+    .d4-check { position: relative; }
+    .d4-check::after { content: ''; position: absolute; inset: -12px; }
+    .d4-check .box { width: 26px; height: 26px; font-size: 16px; }
+    .d4-star { font-size: 26px; padding: 2px 1px; }
+    .d4-link span { min-height: 44px; padding: 0 12px; font-size: 14px; }
+    .d4-foot { gap: 4px; margin-top: 4px; padding-top: 2px; }
+    .my-note-input { font-size: 14px; padding: 8px; }
+    .to-top { position: absolute; left: 10px; bottom: 14px; width: 44px; height: 44px; border-radius: 50%; border: none; background: var(--accent); color: #fff; font-size: 20px; box-shadow: 0 2px 8px rgba(0,0,0,.3); z-index: 500; cursor: pointer; }
+    .to-top.show { display: block; }
+  }
 
   #lockScreen {
     position: fixed; inset: 0; background: var(--bg);
@@ -290,6 +325,7 @@
       <h1>For Kids – Ausflugsziele-Karte</h1>
       <span class="sub">Fahrzeit ab Schwabach (echte Route) · Stand: 20.08.2026</span>
       <span id="statsBar" class="stats-bar"></span>
+      <button id="filterToggle" class="filter-toggle" type="button"><span>☰ Filter und Suche</span><span id="filterToggleInfo">▾</span></button>
     </div>
     <div class="toolbar">
       <input id="aiSearch" class="ai-box" type="text" placeholder="🔎 Was suchst du? z.B. „Boulderhalle in der Nähe“" />
@@ -318,6 +354,7 @@
     <div id="map-pane"></div>
     <div id="tablePane"></div>
     <div id="list-pane">
+      <button id="toTop" class="to-top" type="button" aria-label="Nach oben">↑</button>
       <div id="routeBar" class="route-bar">
         <span class="route-count">0 Ziele ausgewählt</span>
         <button id="openRouteBtn">Rundtour in Google Maps öffnen ↗</button>
@@ -529,6 +566,30 @@ map.on('moveend zoomend', () => {
   if (mapBoundsFilterActive) render();
 });
 
+const MOBILE_MQ = window.matchMedia('(max-width: 600px)');
+if (MOBILE_MQ.matches) {
+  mapBoundsFilterActive = true;
+  document.getElementById('mapBoundsToggle').checked = true;
+  document.getElementById('mapBoundsLabel').classList.add('active');
+}
+document.getElementById('filterToggle').addEventListener('click', () => {
+  document.querySelector('header').classList.toggle('open');
+  updateFilterToggle();
+  setTimeout(() => map.invalidateSize(), 50);
+});
+function updateFilterToggle() {
+  const open = document.querySelector('header').classList.contains('open');
+  const n = (activeGroups.size < Object.keys(GROUPS).length ? 1 : 0) + (searchTerm ? 1 : 0) + (aiParsed ? 1 : 0) + (externalAiNames ? 1 : 0);
+  document.getElementById('filterToggleInfo').textContent = (n ? n + ' aktiv ' : '') + (open ? '▴' : '▾');
+}
+const toTopBtn = document.getElementById('toTop');
+document.querySelector('.table-scroll').addEventListener('scroll', e => {
+  toTopBtn.classList.toggle('show', e.target.scrollTop > 500);
+});
+toTopBtn.addEventListener('click', () => {
+  document.querySelector('.table-scroll').scrollTo({ top: 0, behavior: 'smooth' });
+});
+
 L.circleMarker([SCHWABACH.lat, SCHWABACH.lon], {
   radius: 7, color: "#1a1a1a", weight: 2, fillColor: "#ffd43b", fillOpacity: 1
 }).addTo(map).bindPopup("<b>Schwabach</b><br>Referenzpunkt für Fahrzeiten");
@@ -628,9 +689,9 @@ document.getElementById('resetFilters').addEventListener('click', () => {
   document.getElementById('realAiInput').value = '';
   document.getElementById('realAiFeedback').textContent = '';
   document.getElementById('realAiClear').style.display = 'none';
-  mapBoundsFilterActive = false;
-  document.getElementById('mapBoundsToggle').checked = false;
-  document.getElementById('mapBoundsLabel').classList.remove('active');
+  mapBoundsFilterActive = MOBILE_MQ.matches;
+  document.getElementById('mapBoundsToggle').checked = MOBILE_MQ.matches;
+  document.getElementById('mapBoundsLabel').classList.toggle('active', MOBILE_MQ.matches);
   render();
 });
 document.getElementById('search').addEventListener('input', e => {
@@ -1004,6 +1065,7 @@ function render() {
 
   updateRouteBar();
   updateDeleteBar();
+  updateFilterToggle();
   if (tableMode) renderTable();
 }
 
